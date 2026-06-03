@@ -578,6 +578,24 @@ class FoodService {
     );
   }
 
+  static Future<void> cancelDonation({
+    required String token,
+    required int foodId,
+  }) async {
+    final Map<String, dynamic> response = await _send(
+      () => http.put(
+        Uri.parse('$baseUrl/$foodId/cancel-donation'),
+        headers: ApiConfig.authHeaders(token),
+      ),
+    );
+
+    if (response['success'] == false) {
+      throw Exception(
+        response['message']?.toString() ?? 'Gagal membatalkan donasi.',
+      );
+    }
+  }
+
   static Future<void> confirmPickup({
     required String token,
     required int foodId,

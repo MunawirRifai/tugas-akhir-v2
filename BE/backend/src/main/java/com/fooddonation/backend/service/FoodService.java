@@ -122,6 +122,10 @@ public class FoodService {
                     item.put("expired_at", food.getExpiredAt() != null
                             ? food.getExpiredAt().format(formatter)
                             : null);
+                    item.put("address", food.getAddress());
+                    item.put("category", food.getCategory());
+                    item.put("food_condition", food.getFoodCondition());
+                    item.put("is_halal", food.getIsHalal());
 
                     return item;
                 })
@@ -369,6 +373,18 @@ public class FoodService {
     /**
      * User membatalkan klaim → kembalikan stok sejumlah claimedQuantity.
      */
+    public void cancelDonation(Long foodId, Long userId) {
+        Food food = foodRepository.findById(foodId)
+                .orElseThrow(() -> new RuntimeException("FOOD_NOT_FOUND"));
+
+        if (!food.getUser().getId().equals(userId)) {
+            throw new RuntimeException("FORBIDDEN");
+        }
+
+        food.setStatus("CANCELLED");
+        foodRepository.save(food);
+    }
+
     public void cancelPickup(Long id) {
         Food food = foodRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("FOOD_NOT_FOUND"));

@@ -142,6 +142,19 @@ public class FoodController {
                 return ResponseEntity.ok().build();
         }
 
+        @PutMapping("/{id}/cancel-donation")
+        public ResponseEntity<?> cancelDonation(
+                        @PathVariable Long id,
+                        Authentication authentication) {
+                Long userId = Long.parseLong(authentication.getName());
+                foodService.cancelDonation(id, userId);
+                return ResponseEntity.ok(
+                                ApiResponse.builder()
+                                                .success(true)
+                                                .message("Donation cancelled")
+                                                .build());
+        }
+
         @DeleteMapping("/history/donation")
         public ResponseEntity<?> clearDonationHistory(
                         Authentication authentication) {

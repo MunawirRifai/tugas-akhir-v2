@@ -226,20 +226,24 @@ class _HistoryPageState extends State<HistoryPage>
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Batalkan Postingan?'),
+          title: const Text('Batalkan Donasi?'),
           content: Text(
-            'Postingan "${foodRecord.name}" akan Batalkan dari daftar donasi. '
-            'Tindakan ini tidak dapat dibatalkan.',
+            'Donasi "${foodRecord.name}" akan ditandai sebagai Dibatalkan. '
+            'Postingan tidak akan hilang dari riwayat Anda.',
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Batal'),
+              child: const Text('Kembali'),
             ),
             ElevatedButton.icon(
               onPressed: () => Navigator.of(context).pop(true),
-              icon: const Icon(Icons.delete_outline_rounded),
-              label: const Text('Cancel'),
+              icon: const Icon(Icons.cancel_outlined),
+              label: const Text('Batalkan Donasi'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.danger,
+                foregroundColor: Colors.white,
+              ),
             ),
           ],
         );
@@ -248,10 +252,77 @@ class _HistoryPageState extends State<HistoryPage>
 
     if (confirmed != true || !mounted) return;
 
-    await _deleteFood(foodRecord.id!);
+    await _cancelDonationFood(foodRecord.id!);
   }
 
-  Future<void> _deleteFood(int foodId) async {
+  Future<void> _cancelDonationFood(int foodId) async {
+    setState(() {
+      _busyFoodId = foodId;
+    });
+
+    try {
+      await FoodService.cancelDonation(token: widget.token, foodId: foodId);
+
+      if (!mounted) return;
+
+      _showSnack('Donasi berhasil dibatalkan.', isError: false);
+
+      await _refreshHistory();
+    } catch (error) {
+      if (!mounted) return;
+
+      _showSnack('Gagal membatalkan donasi: $error', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busyFoodId = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _confirmRemove(Map<String, dynamic> food) async {
+    final FoodRecord foodRecord = FoodRecord(food);
+
+    if (foodRecord.id == null) {
+      _showSnack('ID makanan tidak valid.', isError: true);
+      return;
+    }
+
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Hapus dari Riwayat?'),
+          content: Text(
+            'Postingan "${foodRecord.name}" akan dihapus permanen dari riwayat. '
+            'Tindakan ini tidak dapat dibatalkan.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Kembali'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.of(context).pop(true),
+              icon: const Icon(Icons.delete_forever_rounded),
+              label: const Text('Hapus Permanen'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.danger,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    await _removeFood(foodRecord.id!);
+  }
+
+  Future<void> _removeFood(int foodId) async {
     setState(() {
       _busyFoodId = foodId;
     });
@@ -261,13 +332,13 @@ class _HistoryPageState extends State<HistoryPage>
 
       if (!mounted) return;
 
-      _showSnack('Postingan berhasil dibatalkan.', isError: false);
+      _showSnack('Postingan berhasil dihapus.', isError: false);
 
       await _refreshHistory();
     } catch (error) {
       if (!mounted) return;
 
-      _showSnack('Gagal batalkan postingan: $error', isError: true);
+      _showSnack('Gagal menghapus postingan: $error', isError: true);
     } finally {
       if (mounted) {
         setState(() {
@@ -336,6 +407,7 @@ class _HistoryPageState extends State<HistoryPage>
                       },
                       onEdit: _openEdit,
                       onDelete: _confirmDelete,
+                      onRemove: _confirmRemove,
                     ),
                     _HistoryList(
                       type: _HistoryType.claim,
@@ -346,6 +418,7 @@ class _HistoryPageState extends State<HistoryPage>
                       },
                       onEdit: _openEdit,
                       onDelete: _confirmDelete,
+                      onRemove: _confirmRemove,
                     ),
                   ],
                 ),
@@ -534,6 +607,7 @@ class _HistoryList extends StatelessWidget {
   final ValueChanged<Map<String, dynamic>> onOpenDetail;
   final ValueChanged<Map<String, dynamic>> onEdit;
   final ValueChanged<Map<String, dynamic>> onDelete;
+  final ValueChanged<Map<String, dynamic>> onRemove;
 
   const _HistoryList({
     required this.type,
@@ -542,6 +616,7 @@ class _HistoryList extends StatelessWidget {
     required this.onOpenDetail,
     required this.onEdit,
     required this.onDelete,
+    required this.onRemove,
   });
 
   @override
@@ -573,6 +648,7 @@ class _HistoryList extends StatelessWidget {
           onOpenDetail: () => onOpenDetail(food),
           onEdit: () => onEdit(food),
           onDelete: () => onDelete(food),
+          onRemove: () => onRemove(food),
         );
       },
     );
@@ -587,6 +663,7 @@ class _HistoryFoodCard extends StatelessWidget {
   final VoidCallback onOpenDetail;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onRemove;
 
   const _HistoryFoodCard({
     required this.type,
@@ -596,11 +673,35 @@ class _HistoryFoodCard extends StatelessWidget {
     required this.onOpenDetail,
     required this.onEdit,
     required this.onDelete,
+    required this.onRemove,
   });
 
-  bool get _isDonation {
-    return type == _HistoryType.donation;
+  bool get _isDonation => type == _HistoryType.donation;
+
+  /// Donasi aktif: bisa dibatalkan
+  bool get _isActive {
+    final String s = foodRecord.status.toUpperCase();
+    return s == 'POSTED' || s == 'AVAILABLE';
   }
+
+  /// Donasi selesai / dibatalkan: hanya bisa dihapus dari riwayat
+  bool get _isDone {
+    final String s = foodRecord.status.toUpperCase();
+    return s == 'CANCELLED' ||
+        s == 'CANCELED' ||
+        s == 'PICKED_UP' ||
+        s == 'COMPLETED' ||
+        s == 'CLAIMED';
+  }
+
+  /// Tampilkan trash icon di pojok kanan atas:
+  /// - Tab klaim: selalu
+  /// - Tab donasi: hanya saat status done/cancelled
+  bool get _showTrashIcon => !_isDonation || _isDone;
+
+  /// Tampilkan tombol Batalkan:
+  /// - Hanya tab donasi & status aktif
+  bool get _showCancelButton => _isDonation && _isActive;
 
   @override
   Widget build(BuildContext context) {
@@ -611,6 +712,7 @@ class _HistoryFoodCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               AppNetworkImage.food(
                 imageUrl: foodRecord.photoUrl,
@@ -623,11 +725,25 @@ class _HistoryFoodCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      foodRecord.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            foodRecord.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ),
+                        if (_showTrashIcon) ...[
+                          const SizedBox(width: 4),
+                          _TrashIconButton(
+                            isBusy: isBusy,
+                            onDelete: !_isDonation ? onDelete : onRemove,
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -636,7 +752,6 @@ class _HistoryFoodCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
-                    
                     const SizedBox(height: AppSpacing.x1),
                     Wrap(
                       spacing: 6,
@@ -657,42 +772,88 @@ class _HistoryFoodCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.x2),
-
-Row(
-  children: [
-    Expanded(
-      child: ElevatedButton.icon(
-        onPressed: isBusy ? null : onOpenDetail,
-        icon: const Icon(Icons.visibility_outlined),
-        label: const Text('Detail'),
-      ),
-    ),
-
-    const SizedBox(width: AppSpacing.x1),
-
-    Expanded(
-      child: ElevatedButton.icon(
-        onPressed: isBusy ? null : onDelete,
-        icon: isBusy
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
+          if (_showCancelButton)
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: isBusy ? null : onOpenDetail,
+                    icon: const Icon(Icons.visibility_outlined),
+                    label: const Text('Detail'),
+                  ),
                 ),
-              )
-            : const Icon(Icons.delete_outline),
-        label: const Text('Batalkan'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red,
-          foregroundColor: Colors.white,
-        ),
-      ),
-    ),
-  ],
-),
+                const SizedBox(width: AppSpacing.x1),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: isBusy ? null : onDelete,
+                    icon: isBusy
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.cancel_outlined),
+                    label: const Text('Batalkan'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.danger,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          else
+            ElevatedButton.icon(
+              onPressed: isBusy ? null : onOpenDetail,
+              icon: const Icon(Icons.visibility_outlined),
+              label: const Text('Detail'),
+            ),
         ],
+      ),
+    );
+  }
+}
+
+class _TrashIconButton extends StatelessWidget {
+  final bool isBusy;
+  final VoidCallback onDelete;
+
+  const _TrashIconButton({
+    required this.isBusy,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 32,
+      height: 32,
+      child: Material(
+        color: AppColors.dangerSoft,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: InkWell(
+          onTap: isBusy ? null : onDelete,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          child: Center(
+            child: isBusy
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.danger,
+                    ),
+                  )
+                : const Icon(
+                    Icons.delete_outline_rounded,
+                    size: 18,
+                    color: AppColors.danger,
+                  ),
+          ),
+        ),
       ),
     );
   }

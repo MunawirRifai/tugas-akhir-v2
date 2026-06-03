@@ -37,14 +37,7 @@ class ClusteredFoodMarkerLayer extends StatelessWidget {
           }
 
           final int? foodId = _intOf(
-            _valueOf(
-              food,
-              [
-                'id',
-                'food_id',
-                'foodId',
-              ],
-            ),
+            _valueOf(food, ['id', 'food_id', 'foodId']),
           );
 
           final bool isSelected = foodId != null && foodId == selectedFoodId;
@@ -136,15 +129,10 @@ class ClusteredFoodMarkerLayer extends StatelessWidget {
     required Map<String, dynamic> tappedFood,
     required LatLng tappedPosition,
   }) {
-    final List<Map<String, dynamic>> nearbyFoods = _nearbyFoods(
-      tappedPosition,
-    );
+    final List<Map<String, dynamic>> nearbyFoods = _nearbyFoods(tappedPosition);
 
     if (nearbyFoods.length > 1) {
-      _showNearbyFoodsSheet(
-        context: context,
-        foods: nearbyFoods,
-      );
+      _showNearbyFoodsSheet(context: context, foods: nearbyFoods);
       return;
     }
 
@@ -161,11 +149,7 @@ class ClusteredFoodMarkerLayer extends StatelessWidget {
         return false;
       }
 
-      final double meters = distance.as(
-        LengthUnit.Meter,
-        center,
-        position,
-      );
+      final double meters = distance.as(LengthUnit.Meter, center, position);
 
       return meters <= tightRadiusMeters;
     }).toList();
@@ -178,17 +162,9 @@ class ClusteredFoodMarkerLayer extends StatelessWidget {
         return 0;
       }
 
-      final double distanceA = distance.as(
-        LengthUnit.Meter,
-        center,
-        positionA,
-      );
+      final double distanceA = distance.as(LengthUnit.Meter, center, positionA);
 
-      final double distanceB = distance.as(
-        LengthUnit.Meter,
-        center,
-        positionB,
-      );
+      final double distanceB = distance.as(LengthUnit.Meter, center, positionB);
 
       return distanceA.compareTo(distanceB);
     });
@@ -219,40 +195,17 @@ class ClusteredFoodMarkerLayer extends StatelessWidget {
 
   bool _isOwnedByCurrentUser(Map<String, dynamic> food) {
     final int? ownerId = _intOf(
-      _valueOf(
-        food,
-        [
-          'user_id',
-          'userId',
-          'owner_id',
-          'ownerId',
-        ],
-      ),
+      _valueOf(food, ['user_id', 'userId', 'owner_id', 'ownerId']),
     );
 
     return ownerId != null && ownerId == currentUserId;
   }
 
   LatLng? _positionOf(Map<String, dynamic> food) {
-    final double? latitude = _doubleOf(
-      _valueOf(
-        food,
-        [
-          'latitude',
-          'lat',
-        ],
-      ),
-    );
+    final double? latitude = _doubleOf(_valueOf(food, ['latitude', 'lat']));
 
     final double? longitude = _doubleOf(
-      _valueOf(
-        food,
-        [
-          'longitude',
-          'lng',
-          'lon',
-        ],
-      ),
+      _valueOf(food, ['longitude', 'lng', 'lon']),
     );
 
     if (latitude == null || longitude == null) {
@@ -276,82 +229,37 @@ class ClusteredFoodMarkerLayer extends StatelessWidget {
 
   String _foodNameOf(Map<String, dynamic> food) {
     return _textOf(
-      _valueOf(
-        food,
-        [
-          'food_name',
-          'foodName',
-          'name',
-          'title',
-        ],
-      ),
+      _valueOf(food, ['food_name', 'foodName', 'name', 'title']),
       fallback: 'Makanan',
     );
   }
 
   String _categoryTextOf(Map<String, dynamic> food) {
-    return [
-      _textOf(
-        _valueOf(
-          food,
-          [
-            'category',
-            'foodCategory',
-            'food_category',
-            'categoryName',
-          ],
-        ),
-        fallback: '',
-      ),
-      _foodNameOf(food),
-      _textOf(
-        _valueOf(
-          food,
-          [
-            'description',
-            'desc',
-            'note',
-          ],
-        ),
-        fallback: '',
-      ),
-    ].join(' ').toLowerCase();
+    return _textOf(
+      _valueOf(food, [
+        'category',
+        'foodCategory',
+        'food_category',
+        'categoryName',
+      ]),
+      fallback: '',
+    ).toLowerCase();
   }
 
   String _conditionTextOf(Map<String, dynamic> food) {
-    return [
-      _textOf(
-        _valueOf(
-          food,
-          [
-            'condition',
-            'foodCondition',
-            'food_condition',
-            'quality',
-            'readiness',
-          ],
-        ),
-        fallback: '',
-      ),
-      _textOf(
-        _valueOf(
-          food,
-          [
-            'description',
-            'desc',
-            'note',
-          ],
-        ),
-        fallback: '',
-      ),
-      _foodNameOf(food),
-    ].join(' ').toLowerCase();
+    return _textOf(
+      _valueOf(food, [
+        'condition',
+        'foodCondition',
+        'food_condition',
+        'quality',
+        'readiness',
+      ]),
+      fallback: '',
+    ).toLowerCase();
   }
 
-  Object? _valueOf(
-    Map<String, dynamic> data,
-    List<String> keys,
-  ) {
+  Object? _valueOf(Map<String, dynamic> data, List<String> keys) {
     for (final String key in keys) {
       if (data.containsKey(key)) {
         return data[key];
@@ -361,10 +269,7 @@ class ClusteredFoodMarkerLayer extends StatelessWidget {
     return null;
   }
 
-  String _textOf(
-    Object? value, {
-    required String fallback,
-  }) {
+  String _textOf(Object? value, {required String fallback}) {
     final String text = value?.toString().trim() ?? '';
 
     if (text.isEmpty || text == 'null') {
@@ -395,10 +300,7 @@ class _NearbyFoodsSheet extends StatelessWidget {
   final List<Map<String, dynamic>> foods;
   final FoodMarkerTap onFoodTap;
 
-  const _NearbyFoodsSheet({
-    required this.foods,
-    required this.onFoodTap,
-  });
+  const _NearbyFoodsSheet({required this.foods, required this.onFoodTap});
 
   @override
   Widget build(BuildContext context) {
@@ -491,59 +393,25 @@ class _NearbyFoodTile extends StatelessWidget {
   final Map<String, dynamic> food;
   final VoidCallback onTap;
 
-  const _NearbyFoodTile({
-    required this.food,
-    required this.onTap,
-  });
+  const _NearbyFoodTile({required this.food, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final String name = _textOf(
-      _valueOf(
-        food,
-        [
-          'food_name',
-          'foodName',
-          'name',
-          'title',
-        ],
-      ),
+      _valueOf(food, ['food_name', 'foodName', 'name', 'title']),
       fallback: 'Makanan',
     );
 
     final String description = _textOf(
-      _valueOf(
-        food,
-        [
-          'description',
-          'desc',
-          'note',
-        ],
-      ),
+      _valueOf(food, ['description', 'desc', 'note']),
       fallback: 'Tidak ada deskripsi.',
     );
 
-    final int quantity = _intOf(
-          _valueOf(
-            food,
-            [
-              'quantity',
-              'qty',
-              'stock',
-            ],
-          ),
-        ) ??
-        0;
+    final int quantity =
+        _intOf(_valueOf(food, ['quantity', 'qty', 'stock'])) ?? 0;
 
     final String category = _textOf(
-      _valueOf(
-        food,
-        [
-          'category',
-          'foodCategory',
-          'food_category',
-        ],
-      ),
+      _valueOf(food, ['category', 'foodCategory', 'food_category']),
       fallback: 'Kategori belum tersedia',
     );
 
@@ -604,19 +472,13 @@ class _NearbyFoodTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.x1),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: AppColors.textMuted,
-          ),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
         ],
       ),
     );
   }
 
-  Object? _valueOf(
-    Map<String, dynamic> data,
-    List<String> keys,
-  ) {
+  Object? _valueOf(Map<String, dynamic> data, List<String> keys) {
     for (final String key in keys) {
       if (data.containsKey(key)) {
         return data[key];
@@ -626,10 +488,7 @@ class _NearbyFoodTile extends StatelessWidget {
     return null;
   }
 
-  String _textOf(
-    Object? value, {
-    required String fallback,
-  }) {
+  String _textOf(Object? value, {required String fallback}) {
     final String text = value?.toString().trim() ?? '';
 
     if (text.isEmpty || text == 'null') {
@@ -673,20 +532,16 @@ class _SmallPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 13,
-            color: color,
-          ),
+          Icon(icon, size: 13, color: color),
           const SizedBox(width: 4),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w700,
-                ),
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
