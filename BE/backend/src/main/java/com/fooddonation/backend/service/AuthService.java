@@ -49,30 +49,31 @@ public class AuthService {
             throw new RuntimeException("PHONE_ALREADY_EXISTS");
         }
 
-        String verificationCode = String.format("%04d", new Random().nextInt(10000));
+        // String verificationCode = String.format("%04d", new Random().nextInt(10000));
 
         User user = User.builder()
                 .fullName(request.getFullName())
                 .phone(request.getPhone())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .isVerified(false)
-                .verificationCode(verificationCode)
-                .verificationExpiredAt(LocalDateTime.now().plusMinutes(5))
+                //dirubaha ke true verified nya
+                .isVerified(true)
+                // .verificationCode(verificationCode)
+                // .verificationExpiredAt(LocalDateTime.now().plusMinutes(5))
                 .build();
 
         userRepository.save(user);
 
-        SimpleMailMessage message = new SimpleMailMessage();
+        // SimpleMailMessage message = new SimpleMailMessage();
 
-        message.setTo(user.getEmail());
-        message.setSubject("Food Donation Verification");
-        message.setText(
-                "Kode verifikasi akun kamu adalah: "
-                        + verificationCode +
-                        "\n\nKode ini akan expired dalam 5 menit.");
+        // message.setTo(user.getEmail());
+        // message.setSubject("Food Donation Verification");
+        // message.setText(
+        //         "Kode verifikasi akun kamu adalah: "
+        //                 + verificationCode +
+        //                 "\n\nKode ini akan expired dalam 5 menit.");
 
-        mailSender.send(message);
+        // mailSender.send(message);
 
         Map<String, Object> response = new HashMap<>();
 

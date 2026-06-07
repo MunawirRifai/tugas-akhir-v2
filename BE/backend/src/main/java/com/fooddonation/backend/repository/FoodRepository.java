@@ -1,6 +1,8 @@
 package com.fooddonation.backend.repository;
 
 import com.fooddonation.backend.entity.Food;
+import com.fooddonation.backend.entity.FoodClaim;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 
@@ -23,4 +25,6 @@ public interface FoodRepository extends JpaRepository<Food, Long> {
     long countByUserId(Long userId);
 
     long countByClaimedByAndStatus(Long claimedBy, String status);
+
+    List<FoodClaim> findByStatus(String status);
 }

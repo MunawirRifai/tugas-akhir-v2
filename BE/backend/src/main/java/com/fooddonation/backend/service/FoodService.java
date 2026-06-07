@@ -52,7 +52,7 @@ public class FoodService {
         File destination = new File(uploadDir + filename);
         photo.transferTo(destination);
 
-        String photoUrl = "http://localhost:8080/uploads/foods/" + filename;
+        String photoUrl = "http://103.67.78.39:8080/uploads/foods/" + filename;
 
         Food food = new Food();
         food.setUser(user);
@@ -119,6 +119,24 @@ public class FoodService {
                     item.put("claimed_quantity", food.getClaimedQuantity() != null
                             ? food.getClaimedQuantity()
                             : 0);
+                    if ("ON_THE_WAY".equals(food.getStatus())) {
+                        List<FoodClaim> claims = foodClaimRepository.findByFoodId(food.getId());
+                        if (claims != null && !claims.isEmpty()) {
+                            FoodClaim activeClaim = claims.stream()
+                                    .filter(c -> "ON_THE_WAY".equals(c.getStatus()))
+                                    .sorted((c1, c2) -> {
+                                        if (c1.getClaimedAt() == null && c2.getClaimedAt() == null) return 0;
+                                        if (c1.getClaimedAt() == null) return 1;
+                                        if (c2.getClaimedAt() == null) return -1;
+                                        return c2.getClaimedAt().compareTo(c1.getClaimedAt());
+                                    })
+                                    .findFirst()
+                                    .orElse(claims.get(claims.size() - 1));
+                            if (activeClaim.getClaimedAt() != null) {
+                                item.put("claimed_at", activeClaim.getClaimedAt().format(formatter));
+                            }
+                        }
+                    }
                     item.put("expired_at", food.getExpiredAt() != null
                             ? food.getExpiredAt().format(formatter)
                             : null);
