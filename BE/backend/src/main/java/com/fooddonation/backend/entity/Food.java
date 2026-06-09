@@ -46,6 +46,9 @@ public class Food {
     @Column(name = "photo_url")
     private String photoUrl;
 
+    @Column(name = "proof_photo_url")
+    private String proofPhotoUrl;
+
     @Column(name = "expired_at", nullable = false)
     private LocalDateTime expiredAt;
 

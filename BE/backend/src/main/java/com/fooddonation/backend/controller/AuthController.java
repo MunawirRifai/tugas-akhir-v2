@@ -74,6 +74,20 @@ public class AuthController {
                                                 .build());
         }
 
+        @PostMapping("/refresh")
+        public ResponseEntity<ApiResponse<Map<String, Object>>> refresh(
+                        @RequestBody Map<String, String> request) {
+
+                Map<String, Object> data = authService.refreshToken(request);
+
+                return ResponseEntity.ok(
+                                ApiResponse.<Map<String, Object>>builder()
+                                                .success(true)
+                                                .message("Token refreshed successfully")
+                                                .data(data)
+                                                .build());
+        }
+
         @GetMapping("/me")
         public ResponseEntity<?> me(Authentication authentication) {
 

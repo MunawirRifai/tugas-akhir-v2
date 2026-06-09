@@ -207,6 +207,14 @@ class _StatusPillStyle {
           icon: Icons.cancel_rounded,
         );
 
+      case 'EXPIRED':
+      case 'KADALUARSA':
+        return const _StatusPillStyle(
+          label: 'Kadaluarsa',
+          color: AppColors.danger,
+          icon: Icons.timer_off_rounded,
+        );
+
       default:
         if (normalizedStatus.isEmpty || normalizedStatus == 'NULL') {
           return const _StatusPillStyle(

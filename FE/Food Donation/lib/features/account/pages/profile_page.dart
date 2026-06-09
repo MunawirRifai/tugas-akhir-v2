@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/food_mapper.dart';
 import '../../../data/services/auth_service.dart';
+import '../../../data/services/auth_storage.dart';
 import '../../../shared/widgets/common/app_bottom_sheet_handle.dart';
 import '../../../shared/widgets/common/app_info_panel.dart';
 import '../../../shared/widgets/common/app_metric_tile.dart';
@@ -288,6 +289,9 @@ class _ProfilePageState extends State<ProfilePage> {
     } catch (_) {
       // Logout tetap dilanjutkan di sisi FE walaupun endpoint logout gagal.
     }
+
+    // Hapus token dari local storage secara asinkron
+    await AuthStorage.clearToken();
 
     if (!mounted) return;
 

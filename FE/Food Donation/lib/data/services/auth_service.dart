@@ -27,6 +27,18 @@ class AuthService {
     );
   }
 
+  static Future<Map<String, dynamic>> refresh({
+    required String refreshToken,
+  }) async {
+    return _send(
+      () => http.post(
+        Uri.parse('$baseUrl/refresh'),
+        headers: ApiConfig.jsonHeaders(),
+        body: jsonEncode({'refresh_token': refreshToken.trim()}),
+      ),
+    );
+  }
+
   static Future<Map<String, dynamic>> register({
     required String fullName,
     required String email,
@@ -311,6 +323,34 @@ class AuthService {
 
     if (userToken.isNotEmpty && userToken != 'null') {
       return userToken;
+    }
+
+    return null;
+  }
+
+  static String? extractRefreshToken(Map<String, dynamic> response) {
+    final Object? tokenValue = _firstAvailableValue(response, [
+      'refresh_token',
+      'refreshToken',
+    ]);
+
+    final String token = tokenValue?.toString().trim() ?? '';
+
+    if (token.isNotEmpty && token != 'null') {
+      return token;
+    }
+
+    final Map<String, dynamic> data = mapOf(response['data']);
+
+    final Object? dataTokenValue = _firstAvailableValue(data, [
+      'refresh_token',
+      'refreshToken',
+    ]);
+
+    final String dataToken = dataTokenValue?.toString().trim() ?? '';
+
+    if (dataToken.isNotEmpty && dataToken != 'null') {
+      return dataToken;
     }
 
     return null;

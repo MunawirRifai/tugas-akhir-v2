@@ -118,7 +118,7 @@ public class AuthService {
     public Map<String, Object> login(LoginRequest request) {
 
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("INVALID_CREDENTIALS"));
+                .orElseThrow(() -> new RuntimeException("EMAIL_NOT_REGISTERED"));
 
         if (!Boolean.TRUE.equals(user.getIsVerified())) {
             throw new RuntimeException("ACCOUNT_NOT_VERIFIED");
@@ -146,6 +146,43 @@ public class AuthService {
         response.put("refresh_token", refreshToken);
 
         return response;
+    }
+
+    public Map<String, Object> refreshToken(Map<String, String> request) {
+        String refreshToken = request.get("refresh_token");
+        if (refreshToken == null || refreshToken.isBlank()) {
+            refreshToken = request.get("refreshToken");
+        }
+
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new RuntimeException("INVALID_REFRESH_TOKEN");
+        }
+
+        try {
+            Long userId = jwtService.extractUserId(refreshToken);
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND"));
+
+            String newAccessToken = jwtService.generateAccessToken(user.getId());
+            String newRefreshToken = jwtService.generateRefreshToken(user.getId());
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("access_token", newAccessToken);
+            response.put("refresh_token", newRefreshToken);
+
+            Map<String, Object> userData = new HashMap<>();
+            userData.put("id", user.getId());
+            userData.put("full_name", user.getFullName());
+            userData.put("email", user.getEmail());
+            userData.put("phone", user.getPhone());
+            userData.put("photo_url", user.getPhotoUrl());
+            userData.put("role", user.getRole() != null ? user.getRole() : "ROLE_USER");
+            response.put("user", userData);
+
+            return response;
+        } catch (Exception e) {
+            throw new RuntimeException("INVALID_REFRESH_TOKEN");
+        }
     }
 
     public Map<String, Object> getMyProfile(String authValue) {

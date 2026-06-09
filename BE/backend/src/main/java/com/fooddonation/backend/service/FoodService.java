@@ -28,6 +28,7 @@ public class FoodService {
     private final FoodRepository foodRepository;
     private final UserRepository userRepository;
     private final FoodClaimRepository foodClaimRepository;
+    private final NotificationService notificationService;
 
     public Map<String, Object> createFood(
             Long userId,
@@ -52,7 +53,9 @@ public class FoodService {
         File destination = new File(uploadDir + filename);
         photo.transferTo(destination);
 
-        String photoUrl = "http://103.67.78.39:8080/uploads/foods/" + filename;
+        // String photoUrl = "http://103.67.78.39:8080/uploads/foods/" + filename;
+
+        String photoUrl = "http://localhost:8080/uploads/foods/" + filename;
 
         Food food = new Food();
         food.setUser(user);
@@ -75,6 +78,7 @@ public class FoodService {
 
         food.setFoodCondition(request.getFoodCondition());
         foodRepository.save(food);
+        notificationService.notifyNewFood(food);
 
         Map<String, Object> data = new HashMap<>();
         data.put("id", food.getId());
@@ -100,6 +104,8 @@ public class FoodService {
                 .filter(food -> food.getStatus() == null ||
                         food.getStatus().equals("POSTED") ||
                         food.getStatus().equals("ON_THE_WAY"))
+                .filter(food -> food.getExpiredAt() == null ||
+                        food.getExpiredAt().isAfter(LocalDateTime.now()))
                 .map(food -> {
                     Map<String, Object> item = new HashMap<>();
 
@@ -134,9 +140,26 @@ public class FoodService {
                                     .orElse(claims.get(claims.size() - 1));
                             if (activeClaim.getClaimedAt() != null) {
                                 item.put("claimed_at", activeClaim.getClaimedAt().format(formatter));
+                                java.time.Duration diff = java.time.Duration.between(
+                                        LocalDateTime.now(),
+                                        activeClaim.getClaimedAt().plusMinutes(30)
+                                );
+                                long remaining = diff.isNegative() ? 0 : diff.getSeconds();
+                                item.put("remaining_seconds", remaining);
+                                
+                                // Debug logging to file
+                                try (java.io.FileWriter fw = new java.io.FileWriter("debug_timer.log", true);
+                                     java.io.PrintWriter pw = new java.io.PrintWriter(fw)) {
+                                    pw.println("--- getAllFoods ---");
+                                    pw.println("Now: " + LocalDateTime.now());
+                                    pw.println("ClaimedAt: " + activeClaim.getClaimedAt());
+                                    pw.println("Diff: " + diff);
+                                    pw.println("Remaining Seconds: " + remaining);
+                                } catch (Exception e) {}
                             }
                         }
                     }
+
                     item.put("expired_at", food.getExpiredAt() != null
                             ? food.getExpiredAt().format(formatter)
                             : null);
@@ -250,6 +273,18 @@ public class FoodService {
                                     ? claim.getClaimedAt().toString()
                                     : null);
 
+                    long remaining = 0;
+                    if (claim.getClaimedAt() != null && "ON_THE_WAY".equals(claim.getStatus())) {
+                        java.time.Duration diff = java.time.Duration.between(
+                                LocalDateTime.now(),
+                                claim.getClaimedAt().plusMinutes(30)
+                        );
+                        if (!diff.isNegative()) {
+                            remaining = diff.getSeconds();
+                        }
+                    }
+                    item.put("remaining_seconds", remaining);
+
                     item.put(
                             "photo_url",
                             food.getPhotoUrl());
@@ -317,8 +352,16 @@ public class FoodService {
             throw new RuntimeException("ACCOUNT_TIMEOUT");
         }
 
+        if (food.getExpiredAt() != null && food.getExpiredAt().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("FOOD_EXPIRED");
+        }
+
         if (claimQty == null || claimQty < 1) {
             throw new RuntimeException("INVALID_QUANTITY");
+        }
+
+        if (food.getQuantity() == 0) {
+            throw new RuntimeException("FOOD_ALREADY_CLAIMED");
         }
 
         if (claimQty > food.getQuantity()) {
@@ -360,6 +403,12 @@ public class FoodService {
                 claim);
 
         foodRepository.save(food);
+
+        try {
+            notificationService.notifyClaimFood(food, user);
+        } catch (Exception e) {
+            // Abaikan error agar proses transaksi klaim utama tidak terganggu
+        }
     }
 
     public void confirmPickup(Long id) {
@@ -386,6 +435,125 @@ public class FoodService {
         foodClaimRepository.saveAll(claims);
 
         foodRepository.save(food);
+    }
+
+    public Map<String, Object> confirmPickupWithProof(Long id, MultipartFile proofPhoto) throws Exception {
+        Food food = foodRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("FOOD_NOT_FOUND"));
+
+        String uploadDir = System.getProperty("user.dir") + "/uploads/foods/";
+        File folder = new File(uploadDir);
+        if (!folder.exists()) {
+            folder.mkdirs();
+        }
+
+        String filename = UUID.randomUUID() + "_" + proofPhoto.getOriginalFilename();
+        File destination = new File(uploadDir + filename);
+        proofPhoto.transferTo(destination);
+
+        String proofPhotoUrl = "http://localhost:8080/uploads/foods/" + filename;
+
+        food.setProofPhotoUrl(proofPhotoUrl);
+        if (food.getQuantity() == 0) {
+            food.setStatus("PICKED_UP");
+        } else {
+            food.setStatus("POSTED");
+        }
+
+        List<FoodClaim> claims = foodClaimRepository.findAll()
+                .stream()
+                .filter(c -> c.getFoodId().equals(food.getId()) && "ON_THE_WAY".equals(c.getStatus()))
+                .toList();
+
+        for (FoodClaim claim : claims) {
+            claim.setStatus("PICKED_UP");
+            claim.setProofPhotoUrl(proofPhotoUrl);
+            claim.setCompletedAt(LocalDateTime.now());
+        }
+
+        foodClaimRepository.saveAll(claims);
+        foodRepository.save(food);
+
+        try {
+            if (food.getClaimedBy() != null) {
+                User claimer = userRepository.findById(food.getClaimedBy()).orElse(null);
+                if (claimer != null) {
+                    notificationService.notifyCompletePickup(food, claimer, proofPhotoUrl);
+                }
+            }
+        } catch (Exception e) {
+            // Abaikan error agar proses utama tidak terganggu
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("id", food.getId());
+        response.put("proof_photo_url", proofPhotoUrl);
+        return response;
+    }
+
+    public Map<String, Object> getFoodDetail(Long id) {
+        Food food = foodRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("FOOD_NOT_FOUND"));
+
+        DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", food.getId());
+        data.put("food_name", food.getFoodName());
+        data.put("description", food.getDescription());
+        data.put("latitude", food.getLatitude());
+        data.put("longitude", food.getLongitude());
+        data.put("photo_url", food.getPhotoUrl());
+        data.put("quantity", food.getQuantity());
+        data.put("original_quantity", food.getOriginalQuantity() != null
+                ? food.getOriginalQuantity()
+                : food.getQuantity());
+        data.put("status", food.getStatus() == null ? "POSTED" : food.getStatus());
+        data.put("category", food.getCategory());
+        data.put("food_condition", food.getFoodCondition());
+        data.put("is_halal", food.getIsHalal());
+        data.put("expired_at", food.getExpiredAt() != null ? food.getExpiredAt().format(formatter) : null);
+        data.put("address", food.getAddress());
+        data.put("proof_photo_url", food.getProofPhotoUrl());
+
+        data.put("user_id", food.getUser().getId());
+        data.put("owner_name", food.getUser().getFullName());
+        data.put("owner_phone", food.getUser().getPhone());
+
+        if (food.getClaimedBy() != null) {
+            User claimer = userRepository.findById(food.getClaimedBy()).orElse(null);
+            if (claimer != null) {
+                data.put("claimer_name", claimer.getFullName());
+                data.put("claimer_phone", claimer.getPhone());
+            }
+        }
+
+        if ("ON_THE_WAY".equals(food.getStatus())) {
+            List<FoodClaim> claims = foodClaimRepository.findByFoodId(food.getId());
+            if (claims != null && !claims.isEmpty()) {
+                FoodClaim activeClaim = claims.stream()
+                        .filter(c -> "ON_THE_WAY".equals(c.getStatus()))
+                        .sorted((c1, c2) -> {
+                            if (c1.getClaimedAt() == null && c2.getClaimedAt() == null) return 0;
+                            if (c1.getClaimedAt() == null) return 1;
+                            if (c2.getClaimedAt() == null) return -1;
+                            return c2.getClaimedAt().compareTo(c1.getClaimedAt());
+                        })
+                        .findFirst()
+                        .orElse(claims.get(claims.size() - 1));
+                if (activeClaim.getClaimedAt() != null) {
+                    data.put("claimed_at", activeClaim.getClaimedAt().format(formatter));
+                    java.time.Duration diff = java.time.Duration.between(
+                            LocalDateTime.now(),
+                            activeClaim.getClaimedAt().plusMinutes(30)
+                    );
+                    long remaining = diff.isNegative() ? 0 : diff.getSeconds();
+                    data.put("remaining_seconds", remaining);
+                }
+            }
+        }
+
+        return data;
     }
 
     /**

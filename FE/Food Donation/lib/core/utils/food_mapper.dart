@@ -171,7 +171,43 @@ class FoodMapper {
       return null;
     }
 
-    return DateTime.tryParse(rawValue)?.toLocal();
+    DateTime? parsed = DateTime.tryParse(rawValue);
+    if (parsed == null) return null;
+
+    final bool hasOffset = rawValue.contains('Z') ||
+        RegExp(r'[-+]\d{2}:?\d{2}$').hasMatch(rawValue);
+
+    if (!hasOffset) {
+      if (parsed.isUtc) {
+        parsed = DateTime(
+          parsed.year,
+          parsed.month,
+          parsed.day,
+          parsed.hour,
+          parsed.minute,
+          parsed.second,
+          parsed.millisecond,
+          parsed.microsecond,
+        );
+      }
+    } else {
+      parsed = parsed.toLocal();
+    }
+
+    // Koreksi otomatis jika selisih waktu mendekati offset zona waktu lokal
+    // Hal ini menangani inkonsistensi UTC/Lokal pada database
+    final DateTime now = DateTime.now();
+    final Duration localOffset = now.timeZoneOffset;
+    if (localOffset.inMinutes > 0) {
+      final Duration diff = now.difference(parsed);
+      final int offsetMinutes = localOffset.inMinutes;
+      if (diff.inMinutes >= offsetMinutes - 45 &&
+          diff.inMinutes <= offsetMinutes + 45) {
+        parsed = parsed.add(localOffset);
+      }
+    }
+
+    return parsed;
   }
 
   static String dateTimeLabel(
@@ -276,6 +312,8 @@ class FoodMapper {
       case 'CANCELED':
       case 'CANCELLED':
         return 'Dibatalkan';
+      case 'EXPIRED':
+        return 'Kadaluarsa';
       default:
         return status
             .split('_')
@@ -603,7 +641,8 @@ class FoodRecord {
     return status == 'POSTED' ||
         status == 'AVAILABLE' ||
         status == 'CANCELED' ||
-        status == 'CANCELLED';
+        status == 'CANCELLED' ||
+        status == 'EXPIRED';
   }
 
   bool get isAvailable {

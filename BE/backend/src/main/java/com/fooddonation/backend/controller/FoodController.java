@@ -136,6 +136,33 @@ public class FoodController {
                 return ResponseEntity.ok().build();
         }
 
+        @PutMapping(value = "/{id}/confirm-proof", consumes = "multipart/form-data")
+        public ResponseEntity<?> confirmPickupWithProof(
+                        @PathVariable Long id,
+                        @RequestParam("proofPhoto") MultipartFile proofPhoto) throws Exception {
+
+                Map<String, Object> data = foodService.confirmPickupWithProof(id, proofPhoto);
+
+                return ResponseEntity.ok(
+                                ApiResponse.builder()
+                                                .success(true)
+                                                .message("Pickup completed with proof")
+                                                .data(data)
+                                                .build());
+        }
+
+        @GetMapping("/{id}")
+        public ResponseEntity<?> getFoodDetail(@PathVariable Long id) {
+                Map<String, Object> data = foodService.getFoodDetail(id);
+
+                return ResponseEntity.ok(
+                                ApiResponse.builder()
+                                                .success(true)
+                                                .message("Food detail loaded")
+                                                .data(data)
+                                                .build());
+        }
+
         @PutMapping("/{id}/cancel")
         public ResponseEntity<?> cancelPickup(@PathVariable Long id) {
                 foodService.cancelPickup(id);

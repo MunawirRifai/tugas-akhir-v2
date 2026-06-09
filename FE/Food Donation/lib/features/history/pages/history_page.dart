@@ -691,7 +691,8 @@ class _HistoryFoodCard extends StatelessWidget {
         s == 'CANCELED' ||
         s == 'PICKED_UP' ||
         s == 'COMPLETED' ||
-        s == 'CLAIMED';
+        s == 'CLAIMED' ||
+        s == 'EXPIRED';
   }
 
   /// Tampilkan trash icon di pojok kanan atas:
@@ -859,61 +860,7 @@ class _TrashIconButton extends StatelessWidget {
   }
 }
 
-class _HistoryMetaPanel extends StatelessWidget {
-  final String category;
-  final String expiredAtLabel;
-  final String address;
 
-  const _HistoryMetaPanel({
-    required this.category,
-    required this.expiredAtLabel,
-    required this.address,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AppSurfaceCard.soft(
-      padding: const EdgeInsets.all(AppSpacing.x1),
-      borderRadius: AppRadius.lg,
-      child: Column(
-        children: [
-          _MetaLine(icon: Icons.category_outlined, label: category),
-          const SizedBox(height: 6),
-          _MetaLine(icon: Icons.schedule_rounded, label: expiredAtLabel),
-          const SizedBox(height: 6),
-          _MetaLine(icon: Icons.place_outlined, label: address),
-        ],
-      ),
-    );
-  }
-}
-
-class _MetaLine extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _MetaLine({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: AppColors.primaryDark),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.labelMedium?.copyWith(color: AppColors.textSecondary),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 class _EmptyHistoryState extends StatelessWidget {
   final _HistoryType type;

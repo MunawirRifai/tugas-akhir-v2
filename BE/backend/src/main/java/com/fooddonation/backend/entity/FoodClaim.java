@@ -36,4 +36,7 @@ public class FoodClaim {
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
+
+    @Column(name = "proof_photo_url")
+    private String proofPhotoUrl;
 }

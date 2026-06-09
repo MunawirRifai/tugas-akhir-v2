@@ -88,13 +88,11 @@ class _FoodDetailPageState extends State<FoodDetailPage> {
 
   void _startCountdownTimer() {
     _countdownTimer?.cancel();
-    final DateTime? claimedAt = FoodMapper.dateTimeOf(_food['claimed_at']);
-    if (claimedAt == null) {
+    final DateTime? targetTime = _foodRecord.expiredAt;
+    if (targetTime == null) {
       _remainingTime = Duration.zero;
       return;
     }
-
-    final DateTime targetTime = claimedAt.add(const Duration(minutes: 30));
 
     void updateRemaining() {
       final DateTime now = DateTime.now();
@@ -116,11 +114,7 @@ class _FoodDetailPageState extends State<FoodDetailPage> {
     });
   }
 
-  String _formatDuration(Duration duration) {
-    final int minutes = duration.inMinutes;
-    final int seconds = duration.inSeconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-  }
+
 
   Future<void> _openEditPage() async {
     if (!_canEdit || _isActionBusy) return;
@@ -645,6 +639,7 @@ class _MetaGrid extends StatelessWidget {
         return AppColors.textMuted;
       case 'CANCELED':
       case 'CANCELLED':
+      case 'EXPIRED':
         return AppColors.danger;
       case 'POSTED':
       case 'AVAILABLE':
@@ -726,8 +721,13 @@ class _OwnershipNotice extends StatelessWidget {
   });
 
   String _formatDuration(Duration duration) {
-    final int minutes = duration.inMinutes;
+    final int hours = duration.inHours;
+    final int minutes = duration.inMinutes % 60;
     final int seconds = duration.inSeconds % 60;
+    
+    if (hours > 0) {
+      return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    }
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
@@ -746,11 +746,9 @@ class _OwnershipNotice extends StatelessWidget {
     }
 
     if (isClaimedByCurrentUser && normalizedStatus == 'ON_THE_WAY') {
-      final String desc = hasClaimedAt
-          ? (remainingTime > Duration.zero
-              ? 'Selesaikan pengambilan dengan mengunggah bukti foto setelah makanan diterima. Waktu tersisa: ${_formatDuration(remainingTime)}'
-              : 'Waktu pengambilan telah habis.')
-          : 'Selesaikan pengambilan dengan mengunggah bukti foto setelah makanan diterima.';
+      final String desc = remainingTime > Duration.zero
+          ? 'Selesaikan pengambilan dengan mengunggah bukti foto setelah makanan diterima. Waktu tersisa: ${_formatDuration(remainingTime)}'
+          : 'Waktu pengambilan telah habis.';
       return AppInfoPanel.warning(
         icon: Icons.shopping_bag_outlined,
         title: 'Sedang Anda Ambil',

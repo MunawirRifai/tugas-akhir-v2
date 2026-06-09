@@ -4,7 +4,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/services/auth_service.dart';
 import '../widgets/auth_scaffold.dart';
 import 'login_page.dart';
-import 'verify_page.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});

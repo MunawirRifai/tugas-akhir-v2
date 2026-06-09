@@ -35,6 +35,7 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _searchController = TextEditingController();
 
   Timer? _refreshTimer;
+  Timer? _expiryCheckTimer;
   StreamSubscription<Position>? _positionSubscription;
 
   bool _isLoading = true;
@@ -43,6 +44,7 @@ class _HomePageState extends State<HomePage> {
   bool _locationAllowed = false;
 
   int? _currentUserId;
+  String? _currentUserName;
   int _claimQuantity = 1;
 
   String _searchQuery = '';
@@ -80,11 +82,21 @@ class _HomePageState extends State<HomePage> {
       const Duration(seconds: 15),
       (timer) => _loadFoods(),
     );
+
+    _expiryCheckTimer = Timer.periodic(
+      const Duration(seconds: 2),
+      (timer) {
+        if (mounted) {
+          setState(() {});
+        }
+      },
+    );
   }
 
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _expiryCheckTimer?.cancel();
     _positionSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
@@ -190,6 +202,10 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         _currentUserId = FoodMapper.nullableIntOf(
           FoodMapper.valueOf(source, ['id', 'user_id', 'userId']),
+        );
+        _currentUserName = FoodMapper.textOf(
+          FoodMapper.valueOf(source, ['full_name', 'fullName', 'name']),
+          fallback: '',
         );
       });
     } catch (error) {
@@ -370,9 +386,41 @@ class _HomePageState extends State<HomePage> {
       final bool isSuccess = response['success'] != false;
 
       if (!isSuccess) {
-        throw Exception(
-          response['message']?.toString() ?? 'Gagal mengambil makanan.',
-        );
+        final Map<String, dynamic> errors = response['errors'] is Map
+            ? response['errors'] as Map<String, dynamic>
+            : {};
+        final String rootError = response['error']?.toString() ?? '';
+        final String message = response['message']?.toString() ?? '';
+        final String errorsError = errors['error']?.toString() ?? '';
+
+        final String errorCode = errorsError.isNotEmpty
+            ? errorsError
+            : (rootError.isNotEmpty ? rootError : message);
+
+        String userFriendlyMessage =
+            'Gagal mengambil makanan. Stok mungkin tidak cukup.';
+        if (errorCode == 'FOOD_ALREADY_CLAIMED' || errorCode.contains('CLAIMED')) {
+          userFriendlyMessage =
+              'Makanan ini sudah dibooking atau sedang diambil oleh orang lain.';
+        } else if (errorCode == 'ACCOUNT_TIMEOUT' || errorCode.contains('TIMEOUT')) {
+          userFriendlyMessage = 'Akun Anda sedang dibatasi sementara waktu.';
+        } else if (errorCode == 'FOOD_EXPIRED' || errorCode.contains('EXPIRED')) {
+          userFriendlyMessage = 'Makanan sudah kedaluwarsa.';
+        } else if (errorCode == 'QUANTITY_EXCEEDS_STOCK' || errorCode.contains('STOCK')) {
+          userFriendlyMessage =
+              'Jumlah porsi yang Anda minta melebihi stok yang tersedia.';
+        } else if (errorCode == 'USER_NOT_FOUND') {
+          userFriendlyMessage = 'Pengguna tidak ditemukan.';
+        } else if (errorCode == 'FOOD_NOT_FOUND') {
+          userFriendlyMessage = 'Data makanan tidak ditemukan.';
+        } else if (response['message'] != null &&
+            response['message'] != 'Error' &&
+            response['message'].toString().isNotEmpty) {
+          userFriendlyMessage = response['message'].toString();
+        }
+
+        _showSnack(userFriendlyMessage, isError: true);
+        return;
       }
 
       await _loadFoods();
@@ -386,6 +434,7 @@ class _HomePageState extends State<HomePage> {
           'claimed_by': _currentUserId,
           'claimed_quantity': _claimQuantity,
           'claimed_at': DateTime.now().toIso8601String(),
+          'remaining_seconds': 1800,
         };
       });
 
@@ -396,7 +445,7 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
 
       _showSnack(
-        'Gagal mengambil makanan. Stok mungkin tidak cukup.',
+        'Tidak dapat terhubung ke server atau terjadi kesalahan sistem.',
         isError: true,
       );
     } finally {
@@ -542,6 +591,20 @@ class _HomePageState extends State<HomePage> {
           onShowRoute: (quantity) {
             _showRouteForFood(food, quantity);
           },
+          onCompletePickup: () {
+            setState(() {
+              _selectedFood = food;
+            });
+            Navigator.of(context).pop();
+            _openProofOfPickup();
+          },
+          onCancel: () {
+            setState(() {
+              _selectedFood = food;
+            });
+            Navigator.of(context).pop();
+            _cancelPickup();
+          },
         );
       },
     );
@@ -567,6 +630,10 @@ class _HomePageState extends State<HomePage> {
     final List<Map<String, dynamic>> normalizedFoods = _foods
         .map(FoodMapper.mapOf)
         .where((food) => food.isNotEmpty)
+        .where((food) {
+          final DateTime? expiredAt = FoodRecord(food).expiredAt;
+          return expiredAt == null || expiredAt.isAfter(DateTime.now());
+        })
         .toList();
 
     final String query = _searchQuery.trim().toLowerCase();
@@ -830,8 +897,8 @@ class _HomePageState extends State<HomePage> {
     if (_selectedDestination != null) {
       markers.add(
         Marker(
-          width: 72,
-          height: 72,
+          width: 96,
+          height: 96,
           point: _selectedDestination!,
           child: const MapDestinationMarker(label: 'Tujuan'),
         ),
@@ -1005,6 +1072,7 @@ class _HomePageState extends State<HomePage> {
                   isRefreshing: _isRefreshing,
                   activeFilterCount: _activeFilter.activeCount,
                   hasActiveSearchOrFilter: _hasActiveSearchOrFilter,
+                  currentUserName: _currentUserName,
                   onSearchChanged: _onSearchChanged,
                   onClearSearch: _clearSearch,
                   onOpenFilter: _openFilterSheet,
@@ -1075,6 +1143,7 @@ class _HomeHeader extends StatelessWidget {
   final bool isRefreshing;
   final int activeFilterCount;
   final bool hasActiveSearchOrFilter;
+  final String? currentUserName;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onClearSearch;
   final VoidCallback onOpenFilter;
@@ -1090,6 +1159,7 @@ class _HomeHeader extends StatelessWidget {
     required this.isRefreshing,
     required this.activeFilterCount,
     required this.hasActiveSearchOrFilter,
+    required this.currentUserName,
     required this.onSearchChanged,
     required this.onClearSearch,
     required this.onOpenFilter,
@@ -1124,7 +1194,9 @@ class _HomeHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Donasi Terdekat',
+                      currentUserName != null && currentUserName!.trim().isNotEmpty
+                          ? 'Halo, $currentUserName'
+                          : 'Donasi Terdekat',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -1549,6 +1621,8 @@ class _FoodDetailSheet extends StatefulWidget {
   final VoidCallback onAudioCallTap;
   final VoidCallback onVideoCallTap;
   final ValueChanged<int> onShowRoute;
+  final VoidCallback? onCompletePickup;
+  final VoidCallback? onCancel;
 
   const _FoodDetailSheet({
     required this.food,
@@ -1563,6 +1637,8 @@ class _FoodDetailSheet extends StatefulWidget {
     required this.onAudioCallTap,
     required this.onVideoCallTap,
     required this.onShowRoute,
+    this.onCompletePickup,
+    this.onCancel,
   });
 
   @override
@@ -1586,10 +1662,75 @@ class _FoodDetailSheetState extends State<_FoodDetailSheet> {
         !widget.isOwnedByCurrentUser;
   }
 
+  Timer? _timer;
+  Duration _remaining = Duration.zero;
+
   @override
   void initState() {
     super.initState();
     _quantity = 1;
+    _startTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FoodDetailSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.food['id'] != widget.food['id'] ||
+        oldWidget.food['claimed_at'] != widget.food['claimed_at']) {
+      _startTimer();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    if (!widget.isClaimedByCurrentUser) {
+      _remaining = Duration.zero;
+      return;
+    }
+
+    final int? remainingSecs = FoodMapper.nullableIntOf(widget.food['remaining_seconds']);
+    final DateTime targetTime;
+    if (remainingSecs != null) {
+      targetTime = DateTime.now().add(Duration(seconds: remainingSecs));
+    } else {
+      final DateTime? claimedAt = FoodMapper.dateTimeOf(widget.food['claimed_at']);
+      if (claimedAt == null) {
+        _remaining = Duration.zero;
+        return;
+      }
+      targetTime = claimedAt.add(const Duration(minutes: 30));
+    }
+
+    void updateRemaining() {
+      final DateTime now = DateTime.now();
+      final Duration diff = targetTime.difference(now);
+      if (diff.isNegative) {
+        _remaining = Duration.zero;
+        _timer?.cancel();
+      } else {
+        _remaining = diff;
+      }
+      if (mounted) {
+        setState(() {});
+      }
+    }
+
+    updateRemaining();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      updateRemaining();
+    });
+  }
+
+  String _formatDuration(Duration duration) {
+    final int minutes = duration.inMinutes;
+    final int seconds = duration.inSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
   void _decreaseQuantity() {
@@ -1671,6 +1812,20 @@ class _FoodDetailSheetState extends State<_FoodDetailSheet> {
                       icon: Icons.storefront_rounded,
                       isLarge: true,
                     ),
+                  if (widget.isClaimedByCurrentUser && _remaining > Duration.zero)
+                    StatusPill(
+                      label: _formatDuration(_remaining),
+                      color: AppColors.danger,
+                      icon: Icons.timer_outlined,
+                      isLarge: true,
+                    )
+                  else if (widget.isClaimedByCurrentUser && FoodMapper.dateTimeOf(widget.food['claimed_at']) != null)
+                    const StatusPill(
+                      label: 'Waktu Habis',
+                      color: AppColors.danger,
+                      icon: Icons.timer_off_outlined,
+                      isLarge: true,
+                    ),
                 ],
               ),
               const SizedBox(height: AppSpacing.x2),
@@ -1717,13 +1872,56 @@ class _FoodDetailSheetState extends State<_FoodDetailSheet> {
                   description:
                       'Manajemen edit dan hapus postingan tersedia melalui halaman Riwayat.',
                 )
-              else if (!_canClaim)
+              else if (!_canClaim) ...[
                 AppInfoPanel.info(
                   title: 'Status makanan',
                   description: widget.isClaimedByCurrentUser
-                      ? 'Anda sedang mengambil makanan ini. Tekan tombol Selesaikan Pesanan pada panel peta untuk mengunggah bukti foto.'
+                      ? 'Anda sedang mengambil makanan ini. Gunakan tombol di bawah untuk melihat rute atau memproses pesanan.'
                       : 'Makanan ini sedang diproses oleh pengguna lain.',
-                )
+                ),
+                if (widget.isClaimedByCurrentUser) ...[
+                  const SizedBox(height: AppSpacing.x3),
+                  SizedBox(
+                    height: 52,
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        final int claimedQty = FoodMapper.nullableIntOf(widget.food['claimed_quantity']) ?? foodRecord.quantity;
+                        widget.onShowRoute(claimedQty);
+                      },
+                      icon: const Icon(Icons.alt_route_rounded),
+                      label: const Text('Lihat Rute'),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.x2),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 52,
+                          child: ElevatedButton.icon(
+                            onPressed: widget.onCompletePickup,
+                            icon: const Icon(Icons.check),
+                            label: const Text('Selesai'),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SizedBox(
+                          height: 52,
+                          child: OutlinedButton.icon(
+                            onPressed: widget.onCancel,
+                            icon: const Icon(Icons.close),
+                            label: const Text('Batal'),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ]
               else ...[
                 Text(
                   'Jumlah yang ingin diklaim',
@@ -1813,13 +2011,18 @@ class _PickupActionBarState extends State<_PickupActionBar> {
 
   void _startTimer() {
     _timer?.cancel();
-    final DateTime? claimedAt = FoodMapper.dateTimeOf(widget.food['claimed_at']);
-    if (claimedAt == null) {
-      _remaining = Duration.zero;
-      return;
+    final int? remainingSecs = FoodMapper.nullableIntOf(widget.food['remaining_seconds']);
+    final DateTime targetTime;
+    if (remainingSecs != null) {
+      targetTime = DateTime.now().add(Duration(seconds: remainingSecs));
+    } else {
+      final DateTime? claimedAt = FoodMapper.dateTimeOf(widget.food['claimed_at']);
+      if (claimedAt == null) {
+        _remaining = Duration.zero;
+        return;
+      }
+      targetTime = claimedAt.add(const Duration(minutes: 30));
     }
-
-    final DateTime targetTime = claimedAt.add(const Duration(minutes: 30));
 
     void updateRemaining() {
       final DateTime now = DateTime.now();
@@ -1858,11 +2061,8 @@ class _PickupActionBarState extends State<_PickupActionBar> {
         (_status == 'POSTED' || _status == 'AVAILABLE') &&
         !widget.isOwnedByCurrentUser;
 
-    final bool canManagePickup = true;
+    final bool canManagePickup = widget.isClaimedByCurrentUser;
 
-    print('STATUS BAR = $_status');
-    print('CLAIMED USER = ${widget.isClaimedByCurrentUser}');
-    print(widget.food);
     return AppSurfaceCard(
       padding: const EdgeInsets.all(AppSpacing.x2),
       borderRadius: AppRadius.xl,
@@ -1887,7 +2087,6 @@ class _PickupActionBarState extends State<_PickupActionBar> {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
-                    const SizedBox(height: 2),
                     Row(
                       children: [
                         Text(

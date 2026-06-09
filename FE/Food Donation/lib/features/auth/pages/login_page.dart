@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../data/services/auth_service.dart';
+import '../../../data/services/auth_storage.dart';
 import '../../app_shell/pages/main_navigation_page.dart';
 import '../widgets/auth_scaffold.dart';
 import 'register_page.dart';
@@ -75,6 +76,16 @@ class _LoginPageState extends State<LoginPage> {
         'Login berhasil.',
         isError: false,
       );
+
+      // Simpan token ke local storage secara asinkron
+      await AuthStorage.saveToken(token);
+
+      final String? refreshToken = AuthService.extractRefreshToken(response);
+      if (refreshToken != null && refreshToken.trim().isNotEmpty) {
+        await AuthStorage.saveRefreshToken(refreshToken);
+      }
+
+      if (!mounted) return;
 
       Navigator.of(context).pushReplacement(
         PageRouteBuilder<void>(

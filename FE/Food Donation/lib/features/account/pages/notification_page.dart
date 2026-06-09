@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../data/services/food_service.dart';
+import '../../../data/services/notification_service.dart';
+import '../../../shared/widgets/media/app_network_image.dart';
+
 
 class NotificationPage extends StatefulWidget {
   final String token;
 
-  const NotificationPage({
-    super.key,
-    required this.token,
-  });
+  const NotificationPage({super.key, required this.token});
 
   @override
   State<NotificationPage> createState() => _NotificationPageState();
 }
 
 class _NotificationPageState extends State<NotificationPage> {
+  bool _isLoading = true;
   bool _isRefreshing = false;
   late List<_NotificationItem> _notifications;
 
@@ -38,47 +41,77 @@ class _NotificationPageState extends State<NotificationPage> {
   void initState() {
     super.initState();
 
-    _notifications = _mockNotifications();
+    _notifications = [];
+    _loadNotifications();
   }
 
-  Future<void> _refreshNotifications() async {
-    setState(() {
-      _isRefreshing = true;
-    });
+  Future<void> _loadNotifications({bool showRefreshState = false}) async {
+    if (showRefreshState && mounted) {
+      setState(() {
+        _isRefreshing = true;
+      });
+    }
 
-    await Future<void>.delayed(
-      const Duration(milliseconds: 650),
-    );
+    try {
+      final List<Map<String, dynamic>> result =
+          await NotificationService.getNotifications(token: widget.token);
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      _isRefreshing = false;
-      _notifications = _mockNotifications();
-    });
+      setState(() {
+        _notifications = result.map(_NotificationItem.fromMap).toList();
+        _isLoading = false;
+      });
 
-    _showSnack(
-      'Notifikasi berhasil diperbarui.',
-      isError: false,
-    );
+      if (showRefreshState) {
+        _showSnack('Notifikasi berhasil diperbarui.', isError: false);
+      }
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      _showSnack('Gagal memuat notifikasi: $error', isError: true);
+    } finally {
+      if (mounted && showRefreshState) {
+        setState(() {
+          _isRefreshing = false;
+        });
+      }
+    }
   }
 
-  void _markAllAsRead() {
+  Future<void> _refreshNotifications() {
+    return _loadNotifications(showRefreshState: true);
+  }
+
+  Future<void> _markAllAsRead() async {
+    final List<_NotificationItem> previousNotifications = _notifications;
+
     setState(() {
       _notifications = _notifications
-          .map(
-            (item) => item.copyWith(isRead: true),
-          )
+          .map((item) => item.copyWith(isRead: true))
           .toList();
     });
 
-    _showSnack(
-      'Semua notifikasi ditandai sudah dibaca.',
-      isError: false,
-    );
+    _showSnack('Semua notifikasi ditandai sudah dibaca.', isError: false);
+
+    try {
+      await NotificationService.markAllAsRead(token: widget.token);
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _notifications = previousNotifications;
+      });
+
+      _showSnack('Gagal menandai notifikasi: $error', isError: true);
+    }
   }
 
-  void _markAsRead(String id) {
+  Future<void> _markAsRead(String id) async {
     setState(() {
       _notifications = _notifications.map((item) {
         if (item.id == id) {
@@ -88,6 +121,15 @@ class _NotificationPageState extends State<NotificationPage> {
         return item;
       }).toList();
     });
+
+    try {
+      await NotificationService.markAsRead(
+        token: widget.token,
+        notificationId: id,
+      );
+    } catch (error) {
+      debugPrint('MARK NOTIFICATION READ ERROR: $error');
+    }
   }
 
   void _showNotificationDetail(_NotificationItem item) {
@@ -100,16 +142,14 @@ class _NotificationPageState extends State<NotificationPage> {
       backgroundColor: Colors.transparent,
       builder: (context) {
         return _NotificationDetailSheet(
+          token: widget.token,
           item: item.copyWith(isRead: true),
         );
       },
     );
   }
 
-  void _showSnack(
-    String message, {
-    required bool isError,
-  }) {
+  void _showSnack(String message, {required bool isError}) {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -118,68 +158,6 @@ class _NotificationPageState extends State<NotificationPage> {
         content: Text(message),
       ),
     );
-  }
-
-  List<_NotificationItem> _mockNotifications() {
-    final DateTime now = DateTime.now();
-
-    return [
-      _NotificationItem(
-        id: 'notif-001',
-        title: 'Makanan berhasil diklaim',
-        message:
-            'Anda sedang mengambil Paket Nasi Box. Selesaikan pengambilan dengan bukti foto setelah makanan diterima.',
-        category: _NotificationCategory.pickup,
-        createdAt: now.subtract(
-          const Duration(minutes: 8),
-        ),
-        isRead: false,
-      ),
-      _NotificationItem(
-        id: 'notif-002',
-        title: 'Ada penerima tertarik',
-        message:
-            'Postingan Roti dan Snack Anda dilihat oleh beberapa pengguna di radius terdekat.',
-        category: _NotificationCategory.donation,
-        createdAt: now.subtract(
-          const Duration(minutes: 34),
-        ),
-        isRead: false,
-      ),
-      _NotificationItem(
-        id: 'notif-003',
-        title: 'Rute prioritas diperbarui',
-        message:
-            'Smart Cart mengatur ulang rute pickup berdasarkan skor prioritas dan jarak terbaru.',
-        category: _NotificationCategory.route,
-        createdAt: now.subtract(
-          const Duration(hours: 1, minutes: 12),
-        ),
-        isRead: true,
-      ),
-      _NotificationItem(
-        id: 'notif-004',
-        title: 'Bukti pengambilan diproses',
-        message:
-            'Bukti foto Anda berhasil dikompresi secara simulatif dan status pengambilan berubah menjadi selesai.',
-        category: _NotificationCategory.proof,
-        createdAt: now.subtract(
-          const Duration(hours: 3),
-        ),
-        isRead: true,
-      ),
-      _NotificationItem(
-        id: 'notif-005',
-        title: 'Tips keamanan donasi',
-        message:
-            'Gunakan komunikasi in-app dan hindari membagikan nomor pribadi saat proses pengambilan makanan.',
-        category: _NotificationCategory.security,
-        createdAt: now.subtract(
-          const Duration(days: 1, hours: 2),
-        ),
-        isRead: true,
-      ),
-    ];
   }
 
   @override
@@ -206,12 +184,18 @@ class _NotificationPageState extends State<NotificationPage> {
                     donationCount: _donationCount,
                     isRefreshing: _isRefreshing,
                     onRefresh: _refreshNotifications,
-                    onMarkAllAsRead:
-                        _unreadCount == 0 ? null : _markAllAsRead,
+                    onMarkAllAsRead: _unreadCount == 0
+                        ? null
+                        : () => _markAllAsRead(),
                   ),
                 ),
               ),
-              if (_notifications.isEmpty)
+              if (_isLoading)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_notifications.isEmpty)
                 const SliverFillRemaining(
                   hasScrollBody: false,
                   child: _EmptyNotificationState(),
@@ -299,9 +283,9 @@ class _NotificationHeader extends StatelessWidget {
                     children: [
                       Text(
                         'Notifikasi',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: Colors.white,
-                            ),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleLarge?.copyWith(color: Colors.white),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -309,8 +293,8 @@ class _NotificationHeader extends StatelessWidget {
                             ? 'Semua notifikasi sudah dibaca.'
                             : '$unreadCount notifikasi belum dibaca.',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.white.withValues(alpha: 0.88),
-                            ),
+                          color: Colors.white.withValues(alpha: 0.88),
+                        ),
                       ),
                     ],
                   ),
@@ -326,10 +310,7 @@ class _NotificationHeader extends StatelessWidget {
                             color: Colors.white,
                           ),
                         )
-                      : const Icon(
-                          Icons.refresh_rounded,
-                          color: Colors.white,
-                        ),
+                      : const Icon(Icons.refresh_rounded, color: Colors.white),
                 ),
               ],
             ),
@@ -368,9 +349,7 @@ class _NotificationHeader extends StatelessWidget {
                 onPressed: onMarkAllAsRead,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
-                  side: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.42),
-                  ),
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.42)),
                 ),
                 icon: const Icon(Icons.done_all_rounded),
                 label: const Text('Tandai Semua Dibaca'),
@@ -401,32 +380,26 @@ class _NotificationSummaryTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.16),
-        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
       ),
       child: Column(
         children: [
-          Icon(
-            icon,
-            color: Colors.white,
-            size: 20,
-          ),
+          Icon(icon, color: Colors.white, size: 20),
           const SizedBox(height: 4),
           Text(
             value,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                ),
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+            ),
           ),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.82),
-                ),
+              color: Colors.white.withValues(alpha: 0.82),
+            ),
           ),
         ],
       ),
@@ -438,10 +411,7 @@ class _NotificationCard extends StatelessWidget {
   final _NotificationItem item;
   final VoidCallback onTap;
 
-  const _NotificationCard({
-    required this.item,
-    required this.onTap,
-  });
+  const _NotificationCard({required this.item, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -482,10 +452,7 @@ class _NotificationCard extends StatelessWidget {
                         color: style.color.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
-                      child: Icon(
-                        style.icon,
-                        color: style.color,
-                      ),
+                      child: Icon(style.icon, color: style.color),
                     ),
                     if (!item.isRead)
                       Positioned(
@@ -518,21 +485,15 @@ class _NotificationCard extends StatelessWidget {
                               item.title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(
-                                    color: AppColors.textPrimary,
-                                  ),
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(color: AppColors.textPrimary),
                             ),
                           ),
                           const SizedBox(width: AppSpacing.x1),
                           Text(
                             item.timeAgoLabel,
-                            style:
-                                Theme.of(context).textTheme.labelSmall?.copyWith(
-                                      color: AppColors.textMuted,
-                                    ),
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(color: AppColors.textMuted),
                           ),
                         ],
                       ),
@@ -591,25 +552,19 @@ class _CategoryPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: color.withValues(alpha: 0.16),
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.16)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            color: color,
-            size: 13,
-          ),
+          Icon(icon, color: color, size: 13),
           const SizedBox(width: 4),
           Text(
             label,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w800,
-                ),
+              color: color,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ],
       ),
@@ -617,88 +572,161 @@ class _CategoryPill extends StatelessWidget {
   }
 }
 
-class _NotificationDetailSheet extends StatelessWidget {
+class _NotificationDetailSheet extends StatefulWidget {
+  final String token;
   final _NotificationItem item;
 
   const _NotificationDetailSheet({
+    required this.token,
     required this.item,
   });
 
   @override
+  State<_NotificationDetailSheet> createState() => _NotificationDetailSheetState();
+}
+
+class _NotificationDetailSheetState extends State<_NotificationDetailSheet> {
+  bool _isLoading = false;
+  Map<String, dynamic>? _foodDetail;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDetailIfNeeded();
+  }
+
+  bool get _shouldFetchDetail {
+    return widget.item.foodId != null &&
+        (widget.item.category == _NotificationCategory.proof ||
+            widget.item.category == _NotificationCategory.pickup);
+  }
+
+  Future<void> _fetchDetailIfNeeded() async {
+    if (!_shouldFetchDetail) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final response = await FoodService.getFoodDetail(
+        token: widget.token,
+        foodId: widget.item.foodId!,
+      );
+
+      if (!mounted) return;
+
+      if (response['success'] == true) {
+        setState(() {
+          _foodDetail = response['data'] as Map<String, dynamic>? ?? response;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage = response['message']?.toString() ?? 'Gagal memuat detail makanan.';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Gagal memuat detail makanan: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final _NotificationStyle style = _NotificationStyle.fromCategory(
-      item.category,
+      widget.item.category,
     );
 
     return SafeArea(
       top: false,
       child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+        ),
         decoration: const BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.vertical(
             top: Radius.circular(AppRadius.xl),
           ),
         ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.x3,
-            AppSpacing.x2,
-            AppSpacing.x3,
-            AppSpacing.x3,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 48,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(999),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: AppSpacing.x2),
+              width: 48,
+              height: 5,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.x3,
+                  AppSpacing.x2,
+                  AppSpacing.x3,
+                  AppSpacing.x3,
                 ),
-              ),
-              const SizedBox(height: AppSpacing.x3),
-              Container(
-                width: 68,
-                height: 68,
-                decoration: BoxDecoration(
-                  color: style.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(AppRadius.xl),
-                ),
-                child: Icon(
-                  style.icon,
-                  color: style.color,
-                  size: 34,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.x2),
-              _CategoryPill(
-                label: style.label,
-                color: style.color,
-                icon: style.icon,
-              ),
-              const SizedBox(height: AppSpacing.x2),
-              Text(
-                item.title,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: AppSpacing.x1),
-              Text(
-                item.message,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: AppSpacing.x2),
-              Text(
-                item.timeAgoLabel,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: AppColors.textMuted,
+                child: Column(
+                  children: [
+                    Container(
+                      width: 68,
+                      height: 68,
+                      decoration: BoxDecoration(
+                        color: style.color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(AppRadius.xl),
+                      ),
+                      child: Icon(style.icon, color: style.color, size: 34),
                     ),
+                    const SizedBox(height: AppSpacing.x2),
+                    _CategoryPill(
+                      label: style.label,
+                      color: style.color,
+                      icon: style.icon,
+                    ),
+                    const SizedBox(height: AppSpacing.x2),
+                    Text(
+                      widget.item.title,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: AppSpacing.x1),
+                    Text(
+                      widget.item.message,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: AppSpacing.x2),
+                    Text(
+                      widget.item.timeAgoLabel,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelMedium
+                          ?.copyWith(color: AppColors.textMuted),
+                    ),
+                    if (_shouldFetchDetail) ...[
+                      const SizedBox(height: AppSpacing.x3),
+                      const Divider(),
+                      const SizedBox(height: AppSpacing.x2),
+                      _buildDetailContent(),
+                    ],
+                  ],
+                ),
               ),
-              const SizedBox(height: AppSpacing.x3),
-              SizedBox(
+            ),
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.x3),
+              child: SizedBox(
                 height: 52,
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -707,10 +735,219 @@ class _NotificationDetailSheet extends StatelessWidget {
                   label: const Text('Mengerti'),
                 ),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailContent() {
+    if (_isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: AppSpacing.x4),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.x3),
+          child: Column(
+            children: [
+              Text(
+                _errorMessage!,
+                style: const TextStyle(color: AppColors.danger),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: AppSpacing.x2),
+              OutlinedButton.icon(
+                onPressed: _fetchDetailIfNeeded,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Coba Lagi'),
+              ),
             ],
           ),
         ),
-      ),
+      );
+    }
+
+    if (_foodDetail == null) {
+      return const SizedBox.shrink();
+    }
+
+    final detail = _foodDetail!;
+    final String foodName = detail['food_name']?.toString() ?? '-';
+    final String? description = detail['description']?.toString();
+    final String? address = detail['address']?.toString();
+    final String? proofPhotoUrl = detail['proof_photo_url']?.toString();
+    final String? claimerName = detail['claimer_name']?.toString();
+    final String? claimerPhone = detail['claimer_phone']?.toString();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Detail Makanan',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+        ),
+        const SizedBox(height: AppSpacing.x2),
+        Card(
+          elevation: 0,
+          color: AppColors.surfaceSoft,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            side: const BorderSide(color: AppColors.border),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.x2),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (detail['photo_url'] != null) ...[
+                      AppNetworkImage(
+                        imageUrl: detail['photo_url'].toString(),
+                        width: 72,
+                        height: 72,
+                        borderRadius: AppRadius.md,
+                      ),
+                      const SizedBox(width: AppSpacing.x2),
+                    ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            foodName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          if (detail['category'] != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Kategori: ${detail['category']}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                          if (detail['food_condition'] != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              'Kondisi: ${detail['food_condition']}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (description != null && description.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.x2),
+                  const Divider(),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Deskripsi:',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  Text(
+                    description,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+                if (address != null && address.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.x1),
+                  const Text(
+                    'Lokasi Pengambilan:',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  Text(
+                    address,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        if (claimerName != null || claimerPhone != null) ...[
+          const SizedBox(height: AppSpacing.x3),
+          Text(
+            'Informasi Penerima',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.x2),
+          Card(
+            elevation: 0,
+            color: AppColors.surfaceSoft,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              side: const BorderSide(color: AppColors.border),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+                  child: const Icon(Icons.person_rounded, color: AppColors.primary),
+                ),
+                title: Text(
+                  claimerName ?? 'Penerima',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(claimerPhone ?? 'Tidak ada nomor telepon'),
+                trailing: claimerPhone != null
+                    ? IconButton(
+                        icon: const Icon(Icons.copy_rounded, color: AppColors.primary),
+                        tooltip: 'Salin Nomor',
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: claimerPhone));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Nomor telepon berhasil disalin')),
+                          );
+                        },
+                      )
+                    : null,
+              ),
+            ),
+          ),
+        ],
+        if (widget.item.category == _NotificationCategory.proof &&
+            proofPhotoUrl != null &&
+            proofPhotoUrl.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.x3),
+          Text(
+            'Foto Bukti Penerimaan',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.x2),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            child: AppNetworkImage(
+              imageUrl: proofPhotoUrl,
+              height: 220,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -769,13 +1006,7 @@ class _EmptyNotificationState extends StatelessWidget {
   }
 }
 
-enum _NotificationCategory {
-  donation,
-  pickup,
-  route,
-  proof,
-  security,
-}
+enum _NotificationCategory { donation, pickup, route, proof, security }
 
 class _NotificationItem {
   final String id;
@@ -784,6 +1015,7 @@ class _NotificationItem {
   final _NotificationCategory category;
   final DateTime createdAt;
   final bool isRead;
+  final int? foodId;
 
   const _NotificationItem({
     required this.id,
@@ -792,7 +1024,30 @@ class _NotificationItem {
     required this.category,
     required this.createdAt,
     required this.isRead,
+    this.foodId,
   });
+
+  factory _NotificationItem.fromMap(Map<String, dynamic> map) {
+    final String category = _textOf(
+      _valueOf(map, ['category', 'type']),
+      fallback: 'donation',
+    ).toLowerCase();
+
+    return _NotificationItem(
+      id: _textOf(_valueOf(map, ['id', 'notification_id']), fallback: ''),
+      title: _textOf(_valueOf(map, ['title']), fallback: 'Notifikasi'),
+      message: _textOf(
+        _valueOf(map, ['message', 'body', 'description']),
+        fallback: 'Ada pembaruan terbaru.',
+      ),
+      category: _categoryOf(category),
+      createdAt:
+          _dateTimeOf(_valueOf(map, ['created_at', 'createdAt'])) ??
+          DateTime.now(),
+      isRead: _boolOf(_valueOf(map, ['is_read', 'isRead', 'read'])),
+      foodId: _intOf(_valueOf(map, ['food_id', 'foodId'])),
+    );
+  }
 
   _NotificationItem copyWith({
     String? id,
@@ -801,6 +1056,7 @@ class _NotificationItem {
     _NotificationCategory? category,
     DateTime? createdAt,
     bool? isRead,
+    int? foodId,
   }) {
     return _NotificationItem(
       id: id ?? this.id,
@@ -809,6 +1065,7 @@ class _NotificationItem {
       category: category ?? this.category,
       createdAt: createdAt ?? this.createdAt,
       isRead: isRead ?? this.isRead,
+      foodId: foodId ?? this.foodId,
     );
   }
 
@@ -829,6 +1086,64 @@ class _NotificationItem {
 
     return '${difference.inDays} hari lalu';
   }
+
+  static _NotificationCategory _categoryOf(String value) {
+    switch (value) {
+      case 'pickup':
+        return _NotificationCategory.pickup;
+      case 'route':
+        return _NotificationCategory.route;
+      case 'proof':
+        return _NotificationCategory.proof;
+      case 'security':
+        return _NotificationCategory.security;
+      case 'donation':
+      default:
+        return _NotificationCategory.donation;
+    }
+  }
+}
+
+Object? _valueOf(Map<String, dynamic> data, List<String> keys) {
+  for (final String key in keys) {
+    if (data.containsKey(key)) {
+      return data[key];
+    }
+  }
+
+  return null;
+}
+
+String _textOf(Object? value, {required String fallback}) {
+  final String text = value?.toString().trim() ?? '';
+
+  if (text.isEmpty || text == 'null') {
+    return fallback;
+  }
+
+  return text;
+}
+
+bool _boolOf(Object? value) {
+  if (value is bool) return value;
+
+  final String text = value?.toString().trim().toLowerCase() ?? '';
+
+  return text == 'true' || text == '1' || text == 'yes';
+}
+
+int? _intOf(Object? value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  final String text = value.toString().trim();
+  return int.tryParse(text);
+}
+
+DateTime? _dateTimeOf(Object? value) {
+  if (value == null) return null;
+  if (value is DateTime) return value;
+
+  return DateTime.tryParse(value.toString());
 }
 
 class _NotificationStyle {

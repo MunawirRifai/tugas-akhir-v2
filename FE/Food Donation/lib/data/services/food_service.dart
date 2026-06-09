@@ -632,6 +632,20 @@ class FoodService {
     }
   }
 
+  static Future<Map<String, dynamic>> getFoodDetail({
+    required String token,
+    required int foodId,
+  }) async {
+    return _send(
+      () => http.get(
+        Uri.parse('$baseUrl/$foodId'),
+        headers: ApiConfig.authHeaders(token),
+      ),
+    );
+  }
+
+
+
   static String messageOf(
     Map<String, dynamic> response, {
     required String fallback,

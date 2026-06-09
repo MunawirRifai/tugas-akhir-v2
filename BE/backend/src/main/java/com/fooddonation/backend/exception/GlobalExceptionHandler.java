@@ -57,6 +57,28 @@ public class GlobalExceptionHandler {
                             .build());
         }
 
+        if (ex.getMessage().equals("EMAIL_NOT_REGISTERED")) {
+            errors.put("email", "Email anda belum terdaftar");
+
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ErrorResponse.builder()
+                            .success(false)
+                            .message("Email anda belum terdaftar")
+                            .errors(errors)
+                            .build());
+        }
+
+        if (ex.getMessage().equals("INVALID_REFRESH_TOKEN")) {
+            errors.put("refreshToken", "Sesi Anda telah berakhir. Silakan login kembali.");
+
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ErrorResponse.builder()
+                            .success(false)
+                            .message("Sesi Anda telah berakhir. Silakan login kembali.")
+                            .errors(errors)
+                            .build());
+        }
+
         if (ex.getMessage().equals("INVALID_CREDENTIALS")) {
             errors.put("email", "Email or password is incorrect");
 

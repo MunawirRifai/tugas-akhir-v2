@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../data/services/auth_service.dart';
+import '../../../data/services/auth_storage.dart';
+import '../../app_shell/pages/main_navigation_page.dart';
 import 'onboarding_page.dart';
 
 class SplashPage extends StatefulWidget {
@@ -61,7 +64,7 @@ class _SplashPageState extends State<SplashPage>
 
     _navigationTimer = Timer(
       const Duration(milliseconds: 1800),
-      _goToOnboarding,
+      _handleStartupNavigation,
     );
   }
 
@@ -72,16 +75,58 @@ class _SplashPageState extends State<SplashPage>
     super.dispose();
   }
 
-  void _goToOnboarding() {
+  Future<void> _handleStartupNavigation() async {
     if (!mounted) return;
 
+    final String? token = await AuthStorage.getToken();
+    if (!mounted) return;
+
+    if (token != null && token.trim().isNotEmpty) {
+      try {
+        final Map<String, dynamic> profileResponse = await AuthService.getProfile(token);
+        if (profileResponse['success'] == true) {
+          if (!mounted) return;
+          _navigateToPage(MainNavigationPage(token: token));
+          return;
+        }
+      } catch (_) {
+        // Abaikan error jaringan/validasi lalu coba refresh
+      }
+
+      final String? refreshToken = await AuthStorage.getRefreshToken();
+      if (refreshToken != null && refreshToken.trim().isNotEmpty) {
+        try {
+          final Map<String, dynamic> refreshResponse = await AuthService.refresh(refreshToken: refreshToken);
+          final String? newToken = AuthService.extractAccessToken(refreshResponse);
+          final String? newRefreshToken = AuthService.extractRefreshToken(refreshResponse);
+
+          if (newToken != null && newToken.trim().isNotEmpty) {
+            await AuthStorage.saveToken(newToken);
+            if (newRefreshToken != null && newRefreshToken.trim().isNotEmpty) {
+              await AuthStorage.saveRefreshToken(newRefreshToken);
+            }
+            if (!mounted) return;
+            _navigateToPage(MainNavigationPage(token: newToken));
+            return;
+          }
+        } catch (_) {
+          // Gagal refresh
+        }
+      }
+
+      await AuthStorage.clearToken();
+    }
+
+    if (!mounted) return;
+    _navigateToPage(const OnboardingPage());
+  }
+
+  void _navigateToPage(Widget targetPage) {
     Navigator.of(context).pushReplacement(
       PageRouteBuilder<void>(
         transitionDuration: const Duration(milliseconds: 520),
         reverseTransitionDuration: const Duration(milliseconds: 360),
-        pageBuilder: (context, animation, secondaryAnimation) {
-          return const OnboardingPage();
-        },
+        pageBuilder: (context, animation, secondaryAnimation) => targetPage,
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           final Animation<double> fade = CurvedAnimation(
             parent: animation,

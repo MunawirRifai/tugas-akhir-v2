@@ -5,11 +5,13 @@ import '../../../core/theme/app_theme.dart';
 class HomeBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onChanged;
+  final int unreadCount;
 
   const HomeBottomNavBar({
     super.key,
     required this.currentIndex,
     required this.onChanged,
+    this.unreadCount = 0,
   });
 
   static const List<_BottomNavItemData> _items = [
@@ -84,6 +86,7 @@ class HomeBottomNavBar extends StatelessWidget {
                   index: 2,
                   isActive: currentIndex == 2,
                   onTap: onChanged,
+                  unreadCount: unreadCount,
                 ),
               ),
               Expanded(
@@ -107,12 +110,14 @@ class _BottomNavItem extends StatelessWidget {
   final int index;
   final bool isActive;
   final ValueChanged<int> onTap;
+  final int unreadCount;
 
   const _BottomNavItem({
     required this.data,
     required this.index,
     required this.isActive,
     required this.onTap,
+    this.unreadCount = 0,
   });
 
   @override
@@ -149,10 +154,41 @@ class _BottomNavItem extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      isActive ? data.activeIcon : data.icon,
-                      color: foregroundColor,
-                      size: 20,
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Icon(
+                          isActive ? data.activeIcon : data.icon,
+                          color: foregroundColor,
+                          size: 20,
+                        ),
+                        if (index == 2 && unreadCount > 0)
+                          Positioned(
+                            top: -4,
+                            right: -4,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                color: AppColors.danger,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 14,
+                                minHeight: 14,
+                              ),
+                              child: Text(
+                                unreadCount > 9 ? '9+' : '$unreadCount',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                  height: 1.0,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Flexible(

@@ -1,0 +1,24 @@
+=== FOOD CLAIMS ===
+{id=25, claimed_at=2026-06-08T12:51:25.105426, claimed_quantity=1, claimer_id=42, food_id=669, owner_id=41, status=PICKED_UP, completed_at=null, proof_photo_url=null}
+{id=26, claimed_at=2026-06-08T12:51:54.812388, claimed_quantity=2, claimer_id=42, food_id=669, owner_id=41, status=PICKED_UP, completed_at=null, proof_photo_url=null}
+{id=27, claimed_at=2026-06-08T13:15:54.420727, claimed_quantity=3, claimer_id=42, food_id=670, owner_id=41, status=ON_THE_WAY, completed_at=null, proof_photo_url=null}
+{id=28, claimed_at=2026-06-08T13:22:17.420893, claimed_quantity=3, claimer_id=45, food_id=670, owner_id=41, status=ON_THE_WAY, completed_at=null, proof_photo_url=null}
+{id=29, claimed_at=2026-06-08T13:43:59.390525, claimed_quantity=1, claimer_id=42, food_id=671, owner_id=45, status=PICKED_UP, completed_at=null, proof_photo_url=null}
+{id=30, claimed_at=2026-06-08T18:17:49.331881, claimed_quantity=1, claimer_id=46, food_id=672, owner_id=47, status=PICKED_UP, completed_at=2026-06-08T18:18:50.671902, proof_photo_url=http://localhost:8080/uploads/foods/6ab88c68-edcb-4a75-bc2e-e68318e52ed3_proof_scaled_Screenshot_2026-06-01_091606.png}
+{id=31, claimed_at=2026-06-08T18:19:20.490933, claimed_quantity=2, claimer_id=46, food_id=672, owner_id=47, status=EXPIRED, completed_at=null, proof_photo_url=null}
+{id=32, claimed_at=2026-06-08T18:24:31.324776, claimed_quantity=1, claimer_id=46, food_id=672, owner_id=47, status=EXPIRED, completed_at=null, proof_photo_url=null}
+{id=33, claimed_at=2026-06-08T18:34:03.206239, claimed_quantity=1, claimer_id=46, food_id=673, owner_id=47, status=PICKED_UP, completed_at=2026-06-08T18:53:38.200548, proof_photo_url=http://localhost:8080/uploads/foods/04f07683-04b7-4b93-a4ce-eb99789c458b_proof_scaled_Screenshot_2026-06-01_091606.png}
+{id=34, claimed_at=2026-06-08T18:53:56.272705, claimed_quantity=2, claimer_id=46, food_id=673, owner_id=47, status=ON_THE_WAY, completed_at=null, proof_photo_url=null}
+{id=35, claimed_at=2026-06-08T18:57:55.530492, claimed_quantity=2, claimer_id=46, food_id=673, owner_id=47, status=ON_THE_WAY, completed_at=null, proof_photo_url=null}
+{id=36, claimed_at=2026-06-08T18:59:21.449638, claimed_quantity=2, claimer_id=46, food_id=673, owner_id=47, status=ON_THE_WAY, completed_at=null, proof_photo_url=null}
+{id=37, claimed_at=2026-06-08T19:02:29.288922, claimed_quantity=2, claimer_id=46, food_id=673, owner_id=47, status=ON_THE_WAY, completed_at=null, proof_photo_url=null}
+{id=38, claimed_at=2026-06-08T19:06:42.052154, claimed_quantity=1, claimer_id=46, food_id=673, owner_id=47, status=ON_THE_WAY, completed_at=null, proof_photo_url=null}
+{id=39, claimed_at=2026-06-08T19:13:18.552652, claimed_quantity=1, claimer_id=46, food_id=674, owner_id=47, status=PICKED_UP, completed_at=2026-06-08T22:11:43.943103, proof_photo_url=http://localhost:8080/uploads/foods/e293d9ba-aef1-4c1f-bc7c-96966a4a6321_proof_scaled_es_kelapa.jpg}
+{id=40, claimed_at=2026-06-08T19:14:14.395397, claimed_quantity=1, claimer_id=46, food_id=674, owner_id=47, status=PICKED_UP, completed_at=2026-06-08T22:11:43.943103, proof_photo_url=http://localhost:8080/uploads/foods/e293d9ba-aef1-4c1f-bc7c-96966a4a6321_proof_scaled_es_kelapa.jpg}
+{id=41, claimed_at=2026-06-08T22:11:31.914570, claimed_quantity=1, claimer_id=46, food_id=674, owner_id=47, status=PICKED_UP, completed_at=2026-06-08T22:11:43.943103, proof_photo_url=http://localhost:8080/uploads/foods/e293d9ba-aef1-4c1f-bc7c-96966a4a6321_proof_scaled_es_kelapa.jpg}
+{id=42, claimed_at=2026-06-08T22:12:46.951132, claimed_quantity=1, claimer_id=46, food_id=675, owner_id=47, status=ON_THE_WAY, completed_at=null, proof_photo_url=null}
+=== FOODS ===
+{id=672, food_name=ikan asin, status=EXPIRED, claimed_by=null, claimed_quantity=0}
+{id=673, food_name=es kelapa, status=CANCELLED, claimed_by=null, claimed_quantity=0}
+{id=674, food_name=es kelapa, status=PICKED_UP, claimed_by=46, claimed_quantity=1}
+{id=675, food_name=ikan asin, status=POSTED, claimed_by=null, claimed_quantity=0}
