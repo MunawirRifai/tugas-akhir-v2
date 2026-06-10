@@ -617,6 +617,21 @@ class FoodRecord {
     );
   }
 
+  String get ownerName {
+    return FoodMapper.textOf(
+      FoodMapper.valueOf(
+        data,
+        [
+          'user_name',
+          'userName',
+          'owner_name',
+          'ownerName',
+        ],
+      ),
+      fallback: 'Donatur',
+    );
+  }
+
   int? get claimedBy {
     return FoodMapper.nullableIntOf(
       FoodMapper.valueOf(

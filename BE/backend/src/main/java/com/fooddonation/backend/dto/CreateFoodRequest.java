@@ -16,4 +16,5 @@ public class CreateFoodRequest {
     private String category;
     private Boolean isHalal;
     private String foodCondition;
+    private String phone;
 }

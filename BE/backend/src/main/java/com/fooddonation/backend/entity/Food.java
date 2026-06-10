@@ -77,4 +77,9 @@ public class Food {
 
     @Column(name = "food_condition")
     private String foodCondition;
+
+    private String phone;
+
+    @Column(name = "claimer_note")
+    private String claimerNote;
 }

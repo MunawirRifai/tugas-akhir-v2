@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 
 import 'core/theme/app_theme.dart';
+import 'core/notifications/local_notification_helper.dart';
 import 'features/onboarding/pages/splash_page.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  try {
+    await LocalNotificationHelper.init();
+  } catch (e) {
+    debugPrint('FAILED TO INITIALIZE LOCAL NOTIFICATIONS: $e');
+  }
 
   runApp(
     const FoodFoundationApp(),

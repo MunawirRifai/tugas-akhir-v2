@@ -53,9 +53,7 @@ public class FoodService {
         File destination = new File(uploadDir + filename);
         photo.transferTo(destination);
 
-        // String photoUrl = "http://103.67.78.39:8080/uploads/foods/" + filename;
-
-        String photoUrl = "http://localhost:8080/uploads/foods/" + filename;
+        String photoUrl = "http://103.67.78.39:8080/uploads/foods/" + filename;
 
         Food food = new Food();
         food.setUser(user);
@@ -77,11 +75,64 @@ public class FoodService {
         food.setIsHalal(request.getIsHalal());
 
         food.setFoodCondition(request.getFoodCondition());
+        food.setPhone(request.getPhone());
         foodRepository.save(food);
         notificationService.notifyNewFood(food);
 
         Map<String, Object> data = new HashMap<>();
         data.put("id", food.getId());
+        data.put("phone", food.getPhone());
+        data.put("food_name", food.getFoodName());
+        data.put("description", food.getDescription());
+        data.put("latitude", food.getLatitude());
+        data.put("longitude", food.getLongitude());
+        data.put("photo_url", food.getPhotoUrl());
+        data.put("quantity", food.getQuantity());
+        data.put("original_quantity", food.getOriginalQuantity());
+        data.put("expired_at", food.getExpiredAt().toString());
+
+        return data;
+    }
+
+    public Map<String, Object> updateFood(Long foodId, Long userId, CreateFoodRequest request, MultipartFile photo) throws Exception {
+        Food food = foodRepository.findById(foodId)
+                .orElseThrow(() -> new RuntimeException("FOOD_NOT_FOUND"));
+
+        if (!food.getUser().getId().equals(userId)) {
+            throw new RuntimeException("UNAUTHORIZED");
+        }
+
+        food.setFoodName(request.getFoodName());
+        food.setDescription(request.getDescription());
+        food.setQuantity(request.getQuantity());
+        food.setOriginalQuantity(request.getQuantity());
+        food.setLatitude(request.getLatitude());
+        food.setLongitude(request.getLongitude());
+        food.setAddress(request.getAddress());
+        food.setExpiredAt(LocalDateTime.parse(request.getExpiredAt()));
+        food.setCategory(request.getCategory());
+        food.setIsHalal(request.getIsHalal());
+        food.setFoodCondition(request.getFoodCondition());
+        food.setPhone(request.getPhone());
+
+        if (photo != null && !photo.isEmpty()) {
+            String uploadDir = System.getProperty("user.dir") + "/uploads/foods/";
+            File folder = new File(uploadDir);
+            if (!folder.exists()) {
+                folder.mkdirs();
+            }
+            String filename = UUID.randomUUID() + "_" + photo.getOriginalFilename();
+            File destination = new File(uploadDir + filename);
+            photo.transferTo(destination);
+            String photoUrl = "http://103.67.78.39:8080/uploads/foods/" + filename;
+            food.setPhotoUrl(photoUrl);
+        }
+
+        foodRepository.save(food);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", food.getId());
+        data.put("phone", food.getPhone());
         data.put("food_name", food.getFoodName());
         data.put("description", food.getDescription());
         data.put("latitude", food.getLatitude());
@@ -120,6 +171,8 @@ public class FoodService {
                             ? food.getOriginalQuantity()
                             : food.getQuantity());
                     item.put("user_id", food.getUser().getId());
+                    item.put("user_phone", food.getPhone() != null && !food.getPhone().trim().isEmpty() ? food.getPhone().trim() : food.getUser().getPhone());
+                    item.put("user_name", food.getUser().getFullName());
                     item.put("status", food.getStatus() == null ? "POSTED" : food.getStatus());
                     item.put("claimed_by", food.getClaimedBy());
                     item.put("claimed_quantity", food.getClaimedQuantity() != null
@@ -230,6 +283,8 @@ public class FoodService {
                     item.put("food_condition", food.getFoodCondition());
 
                     item.put("user_id", food.getUser().getId());
+                    item.put("user_phone", food.getPhone() != null && !food.getPhone().trim().isEmpty() ? food.getPhone().trim() : food.getUser().getPhone());
+                    item.put("user_name", food.getUser().getFullName());
 
                     return item;
                 }).toList());
@@ -322,6 +377,12 @@ public class FoodService {
                     item.put(
                             "user_id",
                             food.getUser().getId());
+                    item.put(
+                            "user_phone",
+                            food.getUser().getPhone());
+                    item.put(
+                            "user_name",
+                            food.getUser().getFullName());
 
                     return item;
 
@@ -437,7 +498,7 @@ public class FoodService {
         foodRepository.save(food);
     }
 
-    public Map<String, Object> confirmPickupWithProof(Long id, MultipartFile proofPhoto) throws Exception {
+    public Map<String, Object> confirmPickupWithProof(Long id, MultipartFile proofPhoto, String claimerNote) throws Exception {
         Food food = foodRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("FOOD_NOT_FOUND"));
 
@@ -451,9 +512,10 @@ public class FoodService {
         File destination = new File(uploadDir + filename);
         proofPhoto.transferTo(destination);
 
-        String proofPhotoUrl = "http://localhost:8080/uploads/foods/" + filename;
+        String proofPhotoUrl = "http://103.67.78.39:8080/uploads/foods/" + filename;
 
         food.setProofPhotoUrl(proofPhotoUrl);
+        food.setClaimerNote(claimerNote);
         if (food.getQuantity() == 0) {
             food.setStatus("PICKED_UP");
         } else {
@@ -468,6 +530,7 @@ public class FoodService {
         for (FoodClaim claim : claims) {
             claim.setStatus("PICKED_UP");
             claim.setProofPhotoUrl(proofPhotoUrl);
+            claim.setClaimerNote(claimerNote);
             claim.setCompletedAt(LocalDateTime.now());
         }
 
@@ -515,10 +578,13 @@ public class FoodService {
         data.put("expired_at", food.getExpiredAt() != null ? food.getExpiredAt().format(formatter) : null);
         data.put("address", food.getAddress());
         data.put("proof_photo_url", food.getProofPhotoUrl());
+        data.put("claimer_note", food.getClaimerNote());
 
+        data.put("phone", food.getPhone());
+        data.put("user_phone", food.getPhone() != null && !food.getPhone().trim().isEmpty() ? food.getPhone().trim() : food.getUser().getPhone());
         data.put("user_id", food.getUser().getId());
         data.put("owner_name", food.getUser().getFullName());
-        data.put("owner_phone", food.getUser().getPhone());
+        data.put("owner_phone", food.getPhone() != null && !food.getPhone().trim().isEmpty() ? food.getPhone().trim() : food.getUser().getPhone());
 
         if (food.getClaimedBy() != null) {
             User claimer = userRepository.findById(food.getClaimedBy()).orElse(null);

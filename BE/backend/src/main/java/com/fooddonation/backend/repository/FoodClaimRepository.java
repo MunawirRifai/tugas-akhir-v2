@@ -22,5 +22,9 @@ public interface FoodClaimRepository
 
     List<FoodClaim> findByFoodId(Long foodId);
 
-    
+    void deleteByClaimerId(Long claimerId);
+
+    void deleteByOwnerId(Long ownerId);
+
+    void deleteByFoodId(Long foodId);
 }

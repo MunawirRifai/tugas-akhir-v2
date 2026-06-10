@@ -4,12 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/food_mapper.dart';
+import '../../../core/notifications/local_notification_helper.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../data/services/food_service.dart';
 import '../../../data/services/route_service.dart';
+import '../../../data/services/notification_service.dart';
 import '../../../shared/widgets/badges/halal_badge.dart';
 import '../../../shared/widgets/badges/status_pill.dart';
 import '../../../shared/widgets/common/app_info_panel.dart';
@@ -36,6 +39,8 @@ class _HomePageState extends State<HomePage> {
 
   Timer? _refreshTimer;
   Timer? _expiryCheckTimer;
+  Timer? _notificationPollTimer;
+  final Set<int> _showedNotificationIds = {};
   StreamSubscription<Position>? _positionSubscription;
 
   bool _isLoading = true;
@@ -91,25 +96,69 @@ class _HomePageState extends State<HomePage> {
         }
       },
     );
+
+    _notificationPollTimer = Timer.periodic(
+      const Duration(seconds: 8),
+      (timer) => _checkNewNotifications(),
+    );
   }
 
   @override
   void dispose() {
     _refreshTimer?.cancel();
     _expiryCheckTimer?.cancel();
+    _notificationPollTimer?.cancel();
     _positionSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
   Future<void> _bootstrap() async {
-    await Future.wait([_prepareLocation(), _loadCurrentUser(), _loadFoods()]);
+    await Future.wait([
+      _prepareLocation(),
+      _loadCurrentUser(),
+      _loadFoods(),
+      _checkNewNotifications(),
+    ]);
 
     if (!mounted) return;
 
     setState(() {
       _isLoading = false;
     });
+  }
+
+  Future<void> _checkNewNotifications() async {
+    try {
+      final List<Map<String, dynamic>> notifications =
+          await NotificationService.getNotifications(token: widget.token);
+
+      final bool isFirstLoad = _showedNotificationIds.isEmpty;
+
+      for (final Map<String, dynamic> notification in notifications) {
+        final int? id = FoodMapper.nullableIntOf(notification['id']);
+        final bool isRead = notification['is_read'] == true;
+        final String title = notification['title']?.toString() ?? 'Notifikasi Baru';
+        final String body = notification['message']?.toString() ?? '';
+
+        if (id != null) {
+          if (isFirstLoad) {
+            _showedNotificationIds.add(id);
+          } else {
+            if (!isRead && !_showedNotificationIds.contains(id)) {
+              _showedNotificationIds.add(id);
+              await LocalNotificationHelper.showNotification(
+                id: id,
+                title: title,
+                body: body,
+              );
+            }
+          }
+        }
+      }
+    } catch (error) {
+      debugPrint('ERROR FETCHING NOTIFICATIONS FOR POLLING: $error');
+    }
   }
 
   Future<void> _prepareLocation() async {
@@ -766,6 +815,13 @@ class _HomePageState extends State<HomePage> {
           'cemilan',
           'camilan',
           'biskuit',
+        ]);
+      case FoodCategoryFilter.compost:
+        return _containsAny(text, [
+          'kompos',
+          'compost',
+          'pakan',
+          'basi',
         ]);
     }
   }
@@ -1749,6 +1805,51 @@ class _FoodDetailSheetState extends State<_FoodDetailSheet> {
     });
   }
 
+  Future<void> _launchWhatsApp() async {
+    final String rawPhone = FoodMapper.textOf(
+      widget.food['user_phone'],
+      fallback: '',
+    );
+    
+    if (rawPhone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nomor telepon donatur tidak tersedia.'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
+
+    String formattedPhone = rawPhone.replaceAll(RegExp(r'\D'), '');
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '62${formattedPhone.substring(1)}';
+    }
+
+    final String foodName = FoodRecord(widget.food).name;
+    final String message = Uri.encodeComponent(
+      'Halo, saya ingin mengambil donasi makanan Anda: "$foodName". Apakah bisa diambil sekarang?'
+    );
+    
+    final Uri url = Uri.parse('https://wa.me/$formattedPhone?text=$message');
+    
+    try {
+      final bool launched = await launchUrl(url, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        throw 'Tidak bisa membuka WhatsApp.';
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal membuka WhatsApp: $error'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final FoodRecord foodRecord = FoodRecord(widget.food);
@@ -1797,6 +1898,20 @@ class _FoodDetailSheetState extends State<_FoodDetailSheet> {
               Text(
                 foodRecord.name,
                 style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Icon(Icons.person_outline_rounded, size: 16, color: AppColors.textSecondary),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Donatur: ${foodRecord.ownerName}',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                  ),
+                ],
               ),
               const SizedBox(height: AppSpacing.x1),
               Wrap(
@@ -1916,6 +2031,23 @@ class _FoodDetailSheetState extends State<_FoodDetailSheet> {
                             icon: const Icon(Icons.close),
                             label: const Text('Batal'),
                           ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 52,
+                        height: 52,
+                        child: ElevatedButton(
+                          onPressed: _launchWhatsApp,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF25D366),
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppRadius.lg),
+                            ),
+                          ),
+                          child: const Icon(Icons.chat_outlined, size: 24),
                         ),
                       ),
                     ],
@@ -2054,6 +2186,51 @@ class _PickupActionBarState extends State<_PickupActionBar> {
     return FoodRecord(widget.food).status;
   }
 
+  Future<void> _launchWhatsApp() async {
+    final String rawPhone = FoodMapper.textOf(
+      widget.food['user_phone'],
+      fallback: '',
+    );
+    
+    if (rawPhone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nomor telepon donatur tidak tersedia.'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
+
+    String formattedPhone = rawPhone.replaceAll(RegExp(r'\D'), '');
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '62${formattedPhone.substring(1)}';
+    }
+
+    final String foodName = FoodRecord(widget.food).name;
+    final String message = Uri.encodeComponent(
+      'Halo, saya ingin mengambil donasi makanan Anda: "$foodName". Apakah bisa diambil sekarang?'
+    );
+    
+    final Uri url = Uri.parse('https://wa.me/$formattedPhone?text=$message');
+    
+    try {
+      final bool launched = await launchUrl(url, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        throw 'Tidak bisa membuka WhatsApp.';
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal membuka WhatsApp: $error'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final FoodRecord foodRecord = FoodRecord(widget.food);
@@ -2189,6 +2366,25 @@ class _PickupActionBarState extends State<_PickupActionBar> {
                       icon: const Icon(Icons.close),
                       label: const Text('Batal'),
                     ),
+                  ),
+                ),
+
+                const SizedBox(width: 8),
+
+                SizedBox(
+                  width: 52,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: widget.isBusy ? null : _launchWhatsApp,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF25D366),
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                      ),
+                    ),
+                    child: const Icon(Icons.chat_outlined, size: 24),
                   ),
                 ),
               ],

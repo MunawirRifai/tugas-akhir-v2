@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/services/food_service.dart';
 import '../../../data/services/notification_service.dart';
+import '../../../shared/widgets/common/app_surface_card.dart';
 import '../../../shared/widgets/media/app_network_image.dart';
 
 
@@ -786,6 +787,7 @@ class _NotificationDetailSheetState extends State<_NotificationDetailSheet> {
     final String? proofPhotoUrl = detail['proof_photo_url']?.toString();
     final String? claimerName = detail['claimer_name']?.toString();
     final String? claimerPhone = detail['claimer_phone']?.toString();
+    final String? claimerNote = detail['claimer_note']?.toString();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -922,6 +924,43 @@ class _NotificationDetailSheetState extends State<_NotificationDetailSheet> {
                       )
                     : null,
               ),
+            ),
+          ),
+        ],
+        if (claimerNote != null && claimerNote.trim().isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.x3),
+          Text(
+            'Pesan dari Penerima',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.x2),
+          AppSurfaceCard(
+            padding: const EdgeInsets.all(AppSpacing.x3),
+            backgroundColor: AppColors.accentSoft.withValues(alpha: 0.5),
+            borderColor: AppColors.accent.withValues(alpha: 0.15),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  color: AppColors.accent,
+                  size: 20,
+                ),
+                const SizedBox(width: AppSpacing.x2),
+                Expanded(
+                  child: Text(
+                    '"$claimerNote"',
+                    style: const TextStyle(
+                      fontStyle: FontStyle.italic,
+                      color: AppColors.textPrimary,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

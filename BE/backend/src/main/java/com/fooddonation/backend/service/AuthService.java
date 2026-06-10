@@ -315,7 +315,7 @@ public class AuthService {
         File destination = new File(uploadDir + fileName);
         photo.transferTo(destination);
 
-        String photoUrl = "http://localhost:8080/uploads/profile/" + fileName;
+        String photoUrl = "http://103.67.78.39:8080/uploads/profile/" + fileName;
 
         user.setPhotoUrl(photoUrl);
         userRepository.save(user);

@@ -23,7 +23,11 @@ import java.util.Map;
 @CrossOrigin(origins = {
                 "http://localhost:51335",
                 "http://localhost:3000",
-                "http://localhost:8080"
+                "http://localhost:8080",
+                "http://103.67.78.39:51335",
+                "http://103.67.78.39:3000",
+                "http://103.67.78.39:8080",
+                "http://103.67.78.39"
 })
 @RestController
 @RequestMapping("/api/v1/auth")

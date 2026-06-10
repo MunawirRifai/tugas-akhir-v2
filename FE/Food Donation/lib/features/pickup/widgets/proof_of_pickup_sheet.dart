@@ -7,7 +7,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/services/food_service.dart';
 import '../../../shared/widgets/common/app_bottom_sheet_handle.dart';
 import '../../../shared/widgets/common/app_info_panel.dart';
-import '../../../shared/widgets/common/app_metric_tile.dart';
 import '../../../shared/widgets/common/app_surface_card.dart';
 
 class ProofOfPickupSheet extends StatefulWidget {
@@ -51,6 +50,14 @@ class _ProofOfPickupSheetState extends State<ProofOfPickupSheet> {
   XFile? _proofImage;
   Uint8List? _previewBytes;
   ProofImageOptimizationResult? _optimization;
+
+  final TextEditingController _noteController = TextEditingController();
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
 
   bool _isCapturing = false;
   bool _isCompressing = false;
@@ -163,6 +170,7 @@ class _ProofOfPickupSheetState extends State<ProofOfPickupSheet> {
         foodId: widget.foodId,
         proofImage: _proofImage!,
         optimizedProof: optimization,
+        claimerNote: _noteController.text.trim(),
       );
 
       if (!mounted) return;
@@ -271,12 +279,19 @@ class _ProofOfPickupSheetState extends State<ProofOfPickupSheet> {
                         description:
                             'Tidak perlu foto wajah. Cukup foto makanan atau tangan Anda yang sedang menerima makanan sebagai bukti.',
                       ),
-                      if (_optimization != null) ...[
-                        const SizedBox(height: AppSpacing.x2),
-                        _ExtremeCompressionCard(
-                          optimization: _optimization!,
+                      const SizedBox(height: AppSpacing.x2),
+                      TextFormField(
+                        controller: _noteController,
+                        enabled: !_isSubmitting,
+                        maxLines: 3,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: const InputDecoration(
+                          labelText: 'Pesan / Catatan untuk Donatur',
+                          hintText: 'Tulis ucapan terima kasih atau pesan lainnya...',
+                          alignLabelWithHint: true,
+                          prefixIcon: Icon(Icons.rate_review_outlined),
                         ),
-                      ],
+                      ),
                       if (_isCompressing) ...[
                         const SizedBox(height: AppSpacing.x2),
                         const AppInlineInfoPanel.info(
@@ -518,84 +533,6 @@ class _CameraProofBox extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ExtremeCompressionCard extends StatelessWidget {
-  final ProofImageOptimizationResult optimization;
-
-  const _ExtremeCompressionCard({
-    required this.optimization,
-  });
-
-  double get _progressValue {
-    return optimization.compressionRatio.clamp(0.0, 1.0).toDouble();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AppSurfaceCard(
-      padding: const EdgeInsets.all(AppSpacing.x2),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const AppInlineInfoPanel.warning(
-            icon: Icons.compress_rounded,
-            message:
-                'Kompresi Gambar Ekstrem aktif. Target bukti foto maksimal 150KB - 200KB sebelum dikirim ke server.',
-          ),
-          const SizedBox(height: AppSpacing.x2),
-          Row(
-            children: [
-              Expanded(
-                child: AppMetricTile.compact(
-                  label: 'Original',
-                  value: optimization.originalSizeLabel,
-                  icon: Icons.photo_size_select_actual_outlined,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.x1),
-              Expanded(
-                child: AppMetricTile.compact(
-                  label: 'Upload',
-                  value: optimization.estimatedUploadSizeLabel,
-                  icon: Icons.cloud_upload_outlined,
-                  color: AppColors.teal,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.x1),
-              Expanded(
-                child: AppMetricTile.compact(
-                  label: 'Hemat',
-                  value:
-                      '${optimization.estimatedSavedPercent.toStringAsFixed(1)}%',
-                  icon: Icons.network_check_rounded,
-                  color: AppColors.accent,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.x2),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              minHeight: 8,
-              value: _progressValue,
-              color: AppColors.accent,
-              backgroundColor: AppColors.accentSoft,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.x1),
-          Text(
-            'Target maksimal: ${optimization.targetMaxSizeLabel} • Mode: extreme_simulation_150kb_200kb',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-          ),
-        ],
       ),
     );
   }

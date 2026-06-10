@@ -7,7 +7,8 @@ enum FoodCategory {
   drink,
   grocery,
   snack,
-  freshIngredient;
+  freshIngredient,
+  compost;
 
   String get label {
     switch (this) {
@@ -21,6 +22,8 @@ enum FoodCategory {
         return 'Kue/Snack';
       case FoodCategory.freshIngredient:
         return 'Bahan Segar';
+      case FoodCategory.compost:
+        return 'Kompos';
     }
   }
 
@@ -36,6 +39,8 @@ enum FoodCategory {
         return 'kue snack';
       case FoodCategory.freshIngredient:
         return 'bahan segar';
+      case FoodCategory.compost:
+        return 'kompos';
     }
   }
 
@@ -51,6 +56,8 @@ enum FoodCategory {
         return Icons.cookie;
       case FoodCategory.freshIngredient:
         return Icons.eco;
+      case FoodCategory.compost:
+        return Icons.compost_rounded;
     }
   }
 
@@ -66,11 +73,20 @@ enum FoodCategory {
         return 'Contoh: roti, donat, biskuit, keripik, kue basah, dan camilan lainnya.';
       case FoodCategory.freshIngredient:
         return 'Contoh: sayur, buah, daging, ikan, telur, tahu, tempe, dan bahan makanan yang belum menjadi hidangan siap santap.';
+      case FoodCategory.compost:
+        return 'Contoh: limbah sayuran, sisa buah, ampas kelapa, atau bahan organik lainnya untuk kompos/pupuk.';
     }
   }
 
   static FoodCategory fromText(Object? value) {
     final String text = value?.toString().trim().toLowerCase() ?? '';
+
+    if (_containsAny(text, [
+      'kompos',
+      'compost',
+    ])) {
+      return FoodCategory.compost;
+    }
 
     if (_containsAny(text, [
       'minuman',

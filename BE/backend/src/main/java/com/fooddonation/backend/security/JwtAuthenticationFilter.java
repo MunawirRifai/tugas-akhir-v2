@@ -67,6 +67,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         customUserDetailsService.loadUserByUsername(user.getEmail());
 
                 if (jwtService.isTokenValid(token, userId)) {
+                    java.time.LocalDateTime now = java.time.LocalDateTime.now();
+                    if (user.getLastActiveAt() == null || user.getLastActiveAt().isBefore(now.minusMinutes(1))) {
+                        user.setLastActiveAt(now);
+                        userRepository.save(user);
+                    }
 
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(

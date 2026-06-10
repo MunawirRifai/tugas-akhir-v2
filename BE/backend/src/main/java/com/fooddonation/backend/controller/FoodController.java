@@ -47,6 +47,7 @@ public class FoodController {
                         @RequestParam("category") String category,
                         @RequestParam("isHalal") Boolean isHalal,
                         @RequestParam("condition") String condition,
+                        @RequestParam(value = "phone", required = false) String phone,
 
                         @RequestParam("photo") MultipartFile photo) throws Exception {
 
@@ -63,6 +64,7 @@ public class FoodController {
                 request.setCategory(category);
                 request.setIsHalal(isHalal);
                 request.setFoodCondition(condition);
+                request.setPhone(phone);
 
                 Map<String, Object> data = foodService.createFood(userId, request, photo);
 
@@ -70,6 +72,53 @@ public class FoodController {
                                 ApiResponse.builder()
                                                 .success(true)
                                                 .message("Food created")
+                                                .data(data)
+                                                .build());
+        }
+
+        @PutMapping(value = "/{id}", consumes = "multipart/form-data")
+        public ResponseEntity<?> updateFood(
+                        @PathVariable Long id,
+                        Authentication authentication,
+
+                        @RequestParam("foodName") String foodName,
+                        @RequestParam("description") String description,
+                        @RequestParam("quantity") Integer quantity,
+
+                        @RequestParam("latitude") Double latitude,
+                        @RequestParam("longitude") Double longitude,
+
+                        @RequestParam("address") String address,
+                        @RequestParam("expiredAt") String expiredAt,
+
+                        @RequestParam("category") String category,
+                        @RequestParam("isHalal") Boolean isHalal,
+                        @RequestParam("condition") String condition,
+                        @RequestParam(value = "phone", required = false) String phone,
+
+                        @RequestParam(value = "photo", required = false) MultipartFile photo) throws Exception {
+
+                Long userId = Long.parseLong(authentication.getName());
+
+                CreateFoodRequest request = new CreateFoodRequest();
+                request.setFoodName(foodName);
+                request.setDescription(description);
+                request.setQuantity(quantity);
+                request.setLatitude(latitude);
+                request.setLongitude(longitude);
+                request.setAddress(address);
+                request.setExpiredAt(expiredAt);
+                request.setCategory(category);
+                request.setIsHalal(isHalal);
+                request.setFoodCondition(condition);
+                request.setPhone(phone);
+
+                Map<String, Object> data = foodService.updateFood(id, userId, request, photo);
+
+                return ResponseEntity.ok(
+                                ApiResponse.builder()
+                                                .success(true)
+                                                .message("Food updated")
                                                 .data(data)
                                                 .build());
         }
@@ -139,9 +188,10 @@ public class FoodController {
         @PutMapping(value = "/{id}/confirm-proof", consumes = "multipart/form-data")
         public ResponseEntity<?> confirmPickupWithProof(
                         @PathVariable Long id,
-                        @RequestParam("proofPhoto") MultipartFile proofPhoto) throws Exception {
+                        @RequestParam("proofPhoto") MultipartFile proofPhoto,
+                        @RequestParam(value = "claimerNote", required = false) String claimerNote) throws Exception {
 
-                Map<String, Object> data = foodService.confirmPickupWithProof(id, proofPhoto);
+                Map<String, Object> data = foodService.confirmPickupWithProof(id, proofPhoto, claimerNote);
 
                 return ResponseEntity.ok(
                                 ApiResponse.builder()

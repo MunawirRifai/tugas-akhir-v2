@@ -39,4 +39,7 @@ public class FoodClaim {
 
     @Column(name = "proof_photo_url")
     private String proofPhotoUrl;
+
+    @Column(name = "claimer_note")
+    private String claimerNote;
 }

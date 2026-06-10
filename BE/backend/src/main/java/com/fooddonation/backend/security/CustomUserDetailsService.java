@@ -27,6 +27,10 @@ public class CustomUserDetailsService implements UserDetailsService {
             throw new org.springframework.security.authentication.LockedException("Akun Anda telah di-banned.");
         }
 
+        if (user.getTimeoutUntil() != null && user.getTimeoutUntil().isAfter(java.time.LocalDateTime.now())) {
+            throw new org.springframework.security.authentication.LockedException("Akun Anda sedang ditangguhkan.");
+        }
+
         String role = user.getRole() != null ? user.getRole() : "ROLE_USER";
 
         return new org.springframework.security.core.userdetails.User(

@@ -101,18 +101,19 @@ class ApiConfig {
 
   static String get _defaultDevelopmentBaseUrl {
     if (kIsWeb) {
-      return 'http://localhost:8080';
+      return 'http://103.67.78.39:8080';
     }
 
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        return 'http://10.0.2.2:8080'; // Android Emulator
+        return 'http://103.67.78.39:8080';
+
       case TargetPlatform.iOS:
       case TargetPlatform.macOS:
       case TargetPlatform.windows:
       case TargetPlatform.linux:
       case TargetPlatform.fuchsia:
-        return 'http://localhost:8080';
+        return 'http://103.67.78.39:8080';
     }
   }
 }

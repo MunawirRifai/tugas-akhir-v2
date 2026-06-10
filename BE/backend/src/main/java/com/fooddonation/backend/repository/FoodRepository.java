@@ -6,6 +6,7 @@ import com.fooddonation.backend.entity.FoodClaim;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 
+import org.springframework.data.jpa.repository.Query;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -33,4 +34,9 @@ public interface FoodRepository extends JpaRepository<Food, Long> {
     long countByClaimedByAndStatus(Long claimedBy, String status);
 
     List<FoodClaim> findByStatus(String status);
+
+    @Query("SELECT f.category, COUNT(f) FROM Food f GROUP BY f.category")
+    List<Object[]> countFoodsByCategory();
+
+    void deleteByUserId(Long userId);
 }

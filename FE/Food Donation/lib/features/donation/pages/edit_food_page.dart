@@ -22,6 +22,7 @@ enum EditFoodCategory {
   drink,
   grocery,
   snack,
+  compost,
 }
 
 enum EditFoodCondition {
@@ -50,6 +51,12 @@ class _EditFoodPageState extends State<EditFoodPage> {
   final TextEditingController _foodNameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+
+  final GlobalKey _photoKey = GlobalKey();
+  final GlobalKey _nameDescKey = GlobalKey();
+  final GlobalKey _addressKey = GlobalKey();
+  final GlobalKey _phoneKey = GlobalKey();
 
   XFile? _selectedImage;
   Uint8List? _imagePreviewBytes;
@@ -95,6 +102,8 @@ class _EditFoodPageState extends State<EditFoodPage> {
         return 'sembako';
       case EditFoodCategory.snack:
         return 'kue snack';
+      case EditFoodCategory.compost:
+        return 'kompos';
     }
   }
 
@@ -145,6 +154,12 @@ class _EditFoodPageState extends State<EditFoodPage> {
     _addressController.text = foodRecord.address == 'Alamat belum tersedia.'
         ? _coordinateDisplay
         : foodRecord.address;
+
+    final String phone = FoodMapper.textOf(
+      FoodMapper.valueOf(foodRecord.data, ['phone', 'telephone', 'phone_number', 'user_phone']),
+      fallback: '',
+    );
+    _phoneController.text = phone;
   }
 
   @override
@@ -152,11 +167,32 @@ class _EditFoodPageState extends State<EditFoodPage> {
     _foodNameController.dispose();
     _descriptionController.dispose();
     _addressController.dispose();
+    _phoneController.dispose();
     super.dispose();
+  }
+
+  void _scrollToField(GlobalKey key) {
+    if (key.currentContext != null) {
+      Scrollable.ensureVisible(
+        key.currentContext!,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+        alignment: 0.1,
+      );
+    }
   }
 
   EditFoodCategory _categoryFromText(String value) {
     final String text = value.toLowerCase();
+
+    if (_containsAny(text, [
+      'kompos',
+      'compost',
+      'pakan',
+      'basi',
+    ])) {
+      return EditFoodCategory.compost;
+    }
 
     if (_containsAny(text, [
       'minuman',
@@ -400,9 +436,29 @@ class _EditFoodPageState extends State<EditFoodPage> {
   }
 
   Future<void> _submit() async {
-    final FormState? form = _formKey.currentState;
+    // 1. Check if photo is present
+    if (_selectedImage == null && (_existingImageUrl == null || _existingImageUrl!.isEmpty)) {
+      _showSnack('Pilih foto makanan terlebih dahulu.', isError: true);
+      _scrollToField(_photoKey);
+      return;
+    }
 
+    // 2. Validate form fields using _formKey
+    final FormState? form = _formKey.currentState;
     if (form == null || !form.validate()) {
+      if (_foodNameController.text.trim().isEmpty || _foodNameController.text.trim().length < 3) {
+        _showSnack('Nama makanan tidak boleh kosong (minimal 3 karakter).', isError: true);
+        _scrollToField(_nameDescKey);
+      } else if (_descriptionController.text.trim().isEmpty || _descriptionController.text.trim().length < 10) {
+        _showSnack('Deskripsi tidak boleh kosong (minimal 10 karakter).', isError: true);
+        _scrollToField(_nameDescKey);
+      } else if (_addressController.text.trim().isEmpty) {
+        _showSnack('Lokasi pickup belum dipilih.', isError: true);
+        _scrollToField(_addressKey);
+      } else if (_phoneController.text.trim().isEmpty || _phoneController.text.trim().length < 9) {
+        _showSnack('Nomor HP tidak boleh kosong (minimal 9 digit).', isError: true);
+        _scrollToField(_phoneKey);
+      }
       return;
     }
 
@@ -443,6 +499,7 @@ class _EditFoodPageState extends State<EditFoodPage> {
         category: _categoryApiValue,
         isHalal: _isHalal,
         condition: _conditionApiValue,
+        phone: _phoneController.text,
       );
 
       if (!mounted) return;
@@ -513,6 +570,8 @@ class _EditFoodPageState extends State<EditFoodPage> {
         return 'Sembako';
       case EditFoodCategory.snack:
         return 'Kue/Snack';
+      case EditFoodCategory.compost:
+        return 'Kompos';
     }
   }
 
@@ -559,6 +618,8 @@ class _EditFoodPageState extends State<EditFoodPage> {
         return Icons.inventory_2_rounded;
       case EditFoodCategory.snack:
         return Icons.bakery_dining_rounded;
+      case EditFoodCategory.compost:
+        return Icons.compost_rounded;
     }
   }
 
@@ -608,7 +669,8 @@ class _EditFoodPageState extends State<EditFoodPage> {
                       ),
                       const SizedBox(height: AppSpacing.x3),
                       AppSectionCard(
-                        title: 'Foto Makanan',
+                        key: _photoKey,
+                        title: '1. Foto Makanan',
                         subtitle: hasNewImage
                             ? 'Foto baru akan menggantikan foto sebelumnya.'
                             : 'Biarkan kosong jika tidak ingin mengganti foto.',
@@ -631,7 +693,8 @@ class _EditFoodPageState extends State<EditFoodPage> {
                       ],
                       const SizedBox(height: AppSpacing.x2),
                       AppSectionCard(
-                        title: 'Informasi Makanan',
+                        key: _nameDescKey,
+                        title: '2. Informasi Makanan',
                         subtitle:
                             'Perbarui nama, deskripsi, dan jumlah porsi makanan.',
                         icon: Icons.restaurant_menu_rounded,
@@ -711,7 +774,7 @@ class _EditFoodPageState extends State<EditFoodPage> {
                       ),
                       const SizedBox(height: AppSpacing.x2),
                       AppSectionCard(
-                        title: 'Kategori',
+                        title: '3. Kategori',
                         subtitle:
                             'Kategori memengaruhi ikon marker di peta dan filter Home.',
                         icon: Icons.category_outlined,
@@ -734,7 +797,7 @@ class _EditFoodPageState extends State<EditFoodPage> {
                       ),
                       const SizedBox(height: AppSpacing.x2),
                       AppSectionCard(
-                        title: 'Status Halal',
+                        title: '4. Status Halal',
                         subtitle:
                             'Label halal akan tampil pada kartu makanan dan detail makanan.',
                         icon: _isHalal
@@ -756,7 +819,7 @@ class _EditFoodPageState extends State<EditFoodPage> {
                       ),
                       const SizedBox(height: AppSpacing.x2),
                       AppSectionCard(
-                        title: 'Kondisi Kesiapan',
+                        title: '5. Kondisi Kesiapan',
                         subtitle:
                             'Kondisi makanan menentukan warna marker dan prioritas pickup.',
                         icon: Icons.health_and_safety_outlined,
@@ -784,7 +847,8 @@ class _EditFoodPageState extends State<EditFoodPage> {
                       ),
                       const SizedBox(height: AppSpacing.x2),
                       AppSectionCard(
-                        title: 'Lokasi Pickup',
+                        key: _addressKey,
+                        title: '6. Lokasi Pickup',
                         subtitle:
                             'Ubah titik pickup jika lokasi pengambilan berubah.',
                         icon: Icons.map_outlined,
@@ -835,7 +899,37 @@ class _EditFoodPageState extends State<EditFoodPage> {
                       ),
                       const SizedBox(height: AppSpacing.x2),
                       AppSectionCard(
-                        title: 'Batas Pengambilan',
+                        key: _phoneKey,
+                        title: '7. Nomor HP Kontak',
+                        subtitle:
+                            'Nomor HP yang dapat dihubungi oleh penerima manfaat. Default diambil dari profil Anda.',
+                        icon: Icons.phone_rounded,
+                        iconColor: AppColors.primary,
+                        child: TextFormField(
+                          controller: _phoneController,
+                          enabled: !_isSubmitting,
+                          keyboardType: TextInputType.phone,
+                          textInputAction: TextInputAction.next,
+                          decoration: const InputDecoration(
+                            labelText: 'Nomor HP Hubungi',
+                            hintText: 'Contoh: 08123456789',
+                            prefixIcon: Icon(Icons.phone_android_rounded),
+                          ),
+                          validator: (value) {
+                            final String phone = value?.trim() ?? '';
+                            if (phone.isEmpty) {
+                              return 'Nomor HP tidak boleh kosong';
+                            }
+                            if (phone.length < 9) {
+                              return 'Nomor HP minimal 9 digit';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.x2),
+                      AppSectionCard(
+                        title: '8. Batas Pengambilan',
                         subtitle:
                             'Pastikan batas waktu masih masuk akal bagi penerima.',
                         icon: Icons.schedule_rounded,

@@ -40,7 +40,7 @@ public class SecurityConfig {
                 CorsConfiguration configuration = new CorsConfiguration();
 
                 configuration.setAllowedOriginPatterns(
-                                List.of("http://localhost:*"));
+                                List.of("http://localhost:*", "http://103.67.78.39:*"));
 
                 configuration.setAllowedMethods(
                                 List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
@@ -74,7 +74,8 @@ public class SecurityConfig {
 
                                                                 // ENDPOINT TEST QOS TANPA JWT
                                                                 "/api/v1/foods/test/public",
-                                                                "/api/v1/foods/test/public/**")
+                                                                "/api/v1/foods/test/public/**",
+                                                                "/error")
                                                 .permitAll()
 
                                                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")

@@ -202,6 +202,7 @@ class FoodService {
     String? category,
     bool? isHalal,
     String? condition,
+    String? phone,
   }) async {
     try {
       final ImageOptimizationResult optimization =
@@ -237,6 +238,10 @@ class FoodService {
         request.fields['is_halal'] = isHalal.toString();
         request.fields['halalStatus'] = isHalal ? 'halal' : 'non-halal';
         request.fields['halal_status'] = isHalal ? 'halal' : 'non-halal';
+      }
+
+      if (phone != null && phone.trim().isNotEmpty) {
+        request.fields['phone'] = phone.trim();
       }
 
       if (condition != null && condition.trim().isNotEmpty) {
@@ -300,6 +305,7 @@ class FoodService {
     String? category,
     bool? isHalal,
     String? condition,
+    String? phone,
   }) async {
     try {
       final http.MultipartRequest request = http.MultipartRequest(
@@ -332,6 +338,10 @@ class FoodService {
         request.fields['is_halal'] = isHalal.toString();
         request.fields['halalStatus'] = isHalal ? 'halal' : 'non-halal';
         request.fields['halal_status'] = isHalal ? 'halal' : 'non-halal';
+      }
+
+      if (phone != null && phone.trim().isNotEmpty) {
+        request.fields['phone'] = phone.trim();
       }
 
       if (condition != null && condition.trim().isNotEmpty) {
@@ -390,6 +400,7 @@ class FoodService {
     required int foodId,
     required XFile proofImage,
     ProofImageOptimizationResult? optimizedProof,
+    String? claimerNote,
   }) async {
     try {
       final ProofImageOptimizationResult proofOptimization =
@@ -403,6 +414,11 @@ class FoodService {
       request.headers.addAll(
         ApiConfig.authHeaders(token),
       );
+
+      if (claimerNote != null && claimerNote.trim().isNotEmpty) {
+        request.fields['claimerNote'] = claimerNote.trim();
+        request.fields['claimer_note'] = claimerNote.trim();
+      }
 
       request.fields['proofOriginalBytes'] =
           proofOptimization.originalBytes.toString();

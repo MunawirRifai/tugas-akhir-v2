@@ -7,9 +7,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/food_mapper.dart';
+import '../../../data/services/auth_service.dart';
 import '../../../data/services/food_service.dart';
 import '../../../shared/widgets/common/app_info_panel.dart';
-import '../../../shared/widgets/common/app_metric_tile.dart';
 import '../../../shared/widgets/common/app_section_card.dart';
 import '../../../shared/widgets/common/app_surface_card.dart';
 import '../../../shared/widgets/maps/map_marker_shell.dart';
@@ -20,6 +21,7 @@ enum DonationFoodCategory {
   drink,
   grocery,
   snack,
+  compost,
 }
 
 enum DonationFoodCondition {
@@ -46,6 +48,12 @@ class _AddFoodPageState extends State<AddFoodPage> {
   final TextEditingController _foodNameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+
+  final GlobalKey _photoKey = GlobalKey();
+  final GlobalKey _nameDescKey = GlobalKey();
+  final GlobalKey _addressKey = GlobalKey();
+  final GlobalKey _phoneKey = GlobalKey();
 
   XFile? _selectedImage;
   Uint8List? _imagePreviewBytes;
@@ -94,6 +102,8 @@ class _AddFoodPageState extends State<AddFoodPage> {
         return 'sembako';
       case DonationFoodCategory.snack:
         return 'kue snack';
+      case DonationFoodCategory.compost:
+        return 'kompos';
     }
   }
 
@@ -121,11 +131,51 @@ class _AddFoodPageState extends State<AddFoodPage> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _loadUserProfile();
+  }
+
+  @override
   void dispose() {
     _foodNameController.dispose();
     _descriptionController.dispose();
     _addressController.dispose();
+    _phoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final Map<String, dynamic> profile = await AuthService.getProfile(widget.token);
+      if (!mounted) return;
+
+      final Map<String, dynamic> data = FoodMapper.mapOf(profile['data']);
+      final Map<String, dynamic> user = FoodMapper.mapOf(data['user']);
+      final Map<String, dynamic> source = user.isNotEmpty ? user : data;
+
+      final String phone = FoodMapper.textOf(
+        FoodMapper.valueOf(source, ['phone', 'telephone', 'phone_number']),
+        fallback: '',
+      );
+
+      setState(() {
+        _phoneController.text = phone;
+      });
+    } catch (error) {
+      debugPrint('LOAD USER PROFILE ERROR: $error');
+    }
+  }
+
+  void _scrollToField(GlobalKey key) {
+    if (key.currentContext != null) {
+      Scrollable.ensureVisible(
+        key.currentContext!,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+        alignment: 0.1,
+      );
+    }
   }
 
   Future<void> _pickImage() async {
@@ -385,25 +435,29 @@ class _AddFoodPageState extends State<AddFoodPage> {
   }
 
   Future<void> _submit() async {
-    final FormState? form = _formKey.currentState;
-
-    if (form == null || !form.validate()) {
-      return;
-    }
-
+    // 1. Check if photo is chosen
     if (_selectedImage == null) {
-      _showSnack(
-        'Pilih foto makanan terlebih dahulu.',
-        isError: true,
-      );
+      _showSnack('Pilih foto makanan terlebih dahulu.', isError: true);
+      _scrollToField(_photoKey);
       return;
     }
 
-    if (_addressController.text.trim().isEmpty) {
-      _showSnack(
-        'Lokasi pickup belum dipilih.',
-        isError: true,
-      );
+    // 2. Validate form fields using _formKey
+    final FormState? form = _formKey.currentState;
+    if (form == null || !form.validate()) {
+      if (_foodNameController.text.trim().isEmpty || _foodNameController.text.trim().length < 3) {
+        _showSnack('Nama makanan tidak boleh kosong (minimal 3 karakter).', isError: true);
+        _scrollToField(_nameDescKey);
+      } else if (_descriptionController.text.trim().isEmpty || _descriptionController.text.trim().length < 10) {
+        _showSnack('Deskripsi tidak boleh kosong (minimal 10 karakter).', isError: true);
+        _scrollToField(_nameDescKey);
+      } else if (_addressController.text.trim().isEmpty) {
+        _showSnack('Lokasi pickup belum dipilih.', isError: true);
+        _scrollToField(_addressKey);
+      } else if (_phoneController.text.trim().isEmpty || _phoneController.text.trim().length < 9) {
+        _showSnack('Nomor HP tidak boleh kosong (minimal 9 digit).', isError: true);
+        _scrollToField(_phoneKey);
+      }
       return;
     }
 
@@ -432,6 +486,7 @@ class _AddFoodPageState extends State<AddFoodPage> {
         category: _categoryApiValue,
         isHalal: _isHalal,
         condition: _conditionApiValue,
+        phone: _phoneController.text,
       );
 
       if (!mounted) return;
@@ -558,6 +613,8 @@ class _AddFoodPageState extends State<AddFoodPage> {
         return 'Sembako';
       case DonationFoodCategory.snack:
         return 'Kue/Snack';
+      case DonationFoodCategory.compost:
+        return 'Kompos';
     }
   }
 
@@ -593,6 +650,8 @@ class _AddFoodPageState extends State<AddFoodPage> {
         return Icons.inventory_2_rounded;
       case DonationFoodCategory.snack:
         return Icons.bakery_dining_rounded;
+      case DonationFoodCategory.compost:
+        return Icons.compost_rounded;
     }
   }
 
@@ -652,9 +711,10 @@ class _AddFoodPageState extends State<AddFoodPage> {
                         ),
                         const SizedBox(height: AppSpacing.x3),
                         AppSectionCard(
+                          key: _photoKey,
                           title: '1. Foto Makanan',
                           subtitle:
-                              'Upload foto makanan. Sistem menyiapkan simulasi optimasi payload gambar.',
+                              'Upload foto makanan.',
                           icon: Icons.add_photo_alternate_outlined,
                           iconColor: AppColors.accent,
                           iconBackgroundColor: AppColors.accentSoft,
@@ -665,14 +725,9 @@ class _AddFoodPageState extends State<AddFoodPage> {
                             onTap: _pickImage,
                           ),
                         ),
-                        if (_optimizationResult != null) ...[
-                          const SizedBox(height: AppSpacing.x2),
-                          _ImageOptimizationCard(
-                            result: _optimizationResult!,
-                          ),
-                        ],
                         const SizedBox(height: AppSpacing.x2),
                         AppSectionCard(
+                          key: _nameDescKey,
                           title: '2. Nama & Deskripsi',
                           subtitle:
                               'Tuliskan informasi makanan secara jelas agar mudah ditemukan.',
@@ -816,6 +871,7 @@ class _AddFoodPageState extends State<AddFoodPage> {
                         ),
                         const SizedBox(height: AppSpacing.x2),
                         AppSectionCard(
+                          key: _addressKey,
                           title: '6. Lokasi & Map Preview',
                           subtitle:
                               'Pilih koordinat pickup. Pin peta menyesuaikan ikon kategori dan warna kondisi.',
@@ -898,7 +954,37 @@ class _AddFoodPageState extends State<AddFoodPage> {
                         ),
                         const SizedBox(height: AppSpacing.x2),
                         AppSectionCard(
-                          title: 'Detail Jumlah & Waktu',
+                          key: _phoneKey,
+                          title: '7. Nomor HP Kontak',
+                          subtitle:
+                              'Nomor HP yang dapat dihubungi oleh penerima manfaat. Default diambil dari profil Anda.',
+                          icon: Icons.phone_rounded,
+                          iconColor: AppColors.primary,
+                          child: TextFormField(
+                            controller: _phoneController,
+                            enabled: !_isSubmitting,
+                            keyboardType: TextInputType.phone,
+                            textInputAction: TextInputAction.next,
+                            decoration: const InputDecoration(
+                              labelText: 'Nomor HP Hubungi',
+                              hintText: 'Contoh: 08123456789',
+                              prefixIcon: Icon(Icons.phone_android_rounded),
+                            ),
+                            validator: (value) {
+                              final String phone = value?.trim() ?? '';
+                              if (phone.isEmpty) {
+                                return 'Nomor HP tidak boleh kosong';
+                              }
+                              if (phone.length < 9) {
+                                return 'Nomor HP minimal 9 digit';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.x2),
+                        AppSectionCard(
+                          title: '8. Detail Jumlah & Waktu',
                           subtitle:
                               'Data ini tetap diperlukan untuk validasi stok dan batas pengambilan.',
                           icon: Icons.inventory_2_outlined,
@@ -1079,63 +1165,6 @@ class _ImagePickerBox extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ImageOptimizationCard extends StatelessWidget {
-  final ImageOptimizationResult result;
-
-  const _ImageOptimizationCard({
-    required this.result,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AppSurfaceCard(
-      padding: const EdgeInsets.all(AppSpacing.x2),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const AppInlineInfoPanel.info(
-            icon: Icons.network_check_rounded,
-            message:
-                'Mockup Image Optimizer aktif untuk simulasi analisis bandwidth upload.',
-          ),
-          const SizedBox(height: AppSpacing.x2),
-          Row(
-            children: [
-              Expanded(
-                child: AppMetricTile.compact(
-                  label: 'Original',
-                  value: result.originalSizeLabel,
-                  icon: Icons.photo_size_select_actual_outlined,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.x1),
-              Expanded(
-                child: AppMetricTile.compact(
-                  label: 'Upload',
-                  value: result.estimatedUploadSizeLabel,
-                  icon: Icons.cloud_upload_outlined,
-                  color: AppColors.teal,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.x1),
-              Expanded(
-                child: AppMetricTile.compact(
-                  label: 'Hemat',
-                  value:
-                      '${result.estimatedSavedPercent.toStringAsFixed(1)}%',
-                  icon: Icons.compress_rounded,
-                  color: AppColors.accent,
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

@@ -5,6 +5,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import com.fooddonation.backend.service.AdminService;
 import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.util.List;
@@ -15,6 +16,9 @@ class BackendApplicationTests {
 
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
+
+	@Autowired
+	private AdminService adminService;
 
 	@Test
 	void contextLoads() {
@@ -35,4 +39,21 @@ class BackendApplicationTests {
 		}
 	}
 
+	@Test
+	void updateSchema() {
+		try {
+			jdbcTemplate.execute("ALTER TABLE foods ADD COLUMN claimer_note VARCHAR(500) DEFAULT NULL");
+			System.out.println("SCHEMA UPDATE SUCCESS FOR foods!");
+		} catch (Exception e) {
+			System.out.println("foods column might already exist: " + e.getMessage());
+		}
+		try {
+			jdbcTemplate.execute("ALTER TABLE food_claims ADD COLUMN claimer_note VARCHAR(500) DEFAULT NULL");
+			System.out.println("SCHEMA UPDATE SUCCESS FOR food_claims!");
+		} catch (Exception e) {
+			System.out.println("food_claims column might already exist: " + e.getMessage());
+		}
+	}
+
 }
+

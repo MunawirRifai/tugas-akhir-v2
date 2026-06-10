@@ -54,6 +54,9 @@ public class User {
     @Column(name = "timeout_until")
     private LocalDateTime timeoutUntil;
 
+    @Column(name = "last_active_at")
+    private LocalDateTime lastActiveAt;
+
     @PrePersist
     public void prePersist() {
         this.createdAt = LocalDateTime.now();

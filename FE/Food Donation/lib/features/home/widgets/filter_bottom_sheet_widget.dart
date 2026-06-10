@@ -7,6 +7,7 @@ enum FoodCategoryFilter {
   drink,
   grocery,
   snack,
+  compost,
 }
 
 enum HalalStatusFilter {
@@ -372,6 +373,8 @@ class _FilterBottomSheetWidgetState extends State<FilterBottomSheetWidget> {
         return 'Sembako';
       case FoodCategoryFilter.snack:
         return 'Kue/Snack';
+      case FoodCategoryFilter.compost:
+        return 'Kompos';
     }
   }
 
@@ -385,6 +388,8 @@ class _FilterBottomSheetWidgetState extends State<FilterBottomSheetWidget> {
         return Icons.inventory_2_rounded;
       case FoodCategoryFilter.snack:
         return Icons.bakery_dining_rounded;
+      case FoodCategoryFilter.compost:
+        return Icons.compost_rounded;
     }
   }
 

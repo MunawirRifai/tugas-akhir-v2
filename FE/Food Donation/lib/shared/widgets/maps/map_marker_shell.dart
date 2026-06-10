@@ -582,6 +582,13 @@ class MapMarkerStyle {
     final String text = category?.toString().trim().toLowerCase() ?? '';
 
     if (_containsAny(text, [
+      'kompos',
+      'compost',
+    ])) {
+      return Icons.compost_rounded;
+    }
+
+    if (_containsAny(text, [
       'minuman',
       'drink',
       'beverage',
@@ -652,6 +659,13 @@ class MapMarkerStyle {
 
   static String categoryLabel(Object? category) {
     final String text = category?.toString().trim().toLowerCase() ?? '';
+
+    if (_containsAny(text, [
+      'kompos',
+      'compost',
+    ])) {
+      return 'Kompos';
+    }
 
     if (_containsAny(text, [
       'minuman',

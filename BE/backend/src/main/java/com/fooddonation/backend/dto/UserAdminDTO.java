@@ -5,8 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
 @Data
 @Builder
 @NoArgsConstructor
@@ -19,7 +17,9 @@ public class UserAdminDTO {
     private String photoUrl;
     private String role;
     private Boolean isBanned;
-    private LocalDateTime timeoutUntil;
+    private String timeoutUntil;
+    private String lastActiveAt;
     private Long totalDonations;
     private Long totalClaims;
 }
+
